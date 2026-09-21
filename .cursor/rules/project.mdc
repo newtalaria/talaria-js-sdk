@@ -12,7 +12,8 @@ npm workspaces. Published packages: `@newtalaria/browser`, `@newtalaria/core`, `
 ```
 App → Talaria.init
         ├─ capture* / logger     → POST /events/ingestBatch
-        └─ Tracer (optional APM) → POST /spans/ingestBatch
+        ├─ Tracer (optional APM) → POST /spans/ingestBatch
+        └─ analytics.* (opt-in)  → POST /analytics/ingestBatch
 Browser only: rrweb → replays/start|ingestSegmentBatch|finish
 ```
 

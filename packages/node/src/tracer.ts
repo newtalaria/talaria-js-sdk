@@ -26,6 +26,7 @@ export interface NodeTracerOptions {
   release?: string;
   getUserId: () => string | undefined;
   getSessionId: () => string | null;
+  getAnonymousId: () => string | null;
   onPermanentIngestError?: (error: unknown) => void;
 }
 
@@ -189,6 +190,7 @@ export class NodeTracer {
       environment: this.options.environment,
       release: this.options.release,
       userId: this.options.getUserId(),
+      anonymousId: this.options.getAnonymousId() ?? undefined,
       sessionId: this.options.getSessionId() ?? undefined,
     };
     const payload = ready.map((span) => {

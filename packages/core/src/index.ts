@@ -21,6 +21,31 @@ export type {
 export { Scope } from './scope.js';
 
 export {
+  AnalyticsFacade,
+  type AnalyticsBindings,
+  type AnalyticsCallOptions,
+  type AnalyticsPageContext,
+} from './analytics.js';
+
+export {
+  ANONYMOUS_ID_KEY,
+  IdentityStore,
+  SESSION_ID_KEY,
+  SESSION_INACTIVITY_MS,
+  SESSION_TOUCHED_AT_KEY,
+  SESSION_UTM_KEY,
+  createMemoryStorage,
+  createWebStorage,
+  parseFirstTouch,
+  sanitizeTelemetryUrl,
+  utcDateKey,
+  type FirstTouchAttribution,
+  type IdentityStorage,
+  type IdentityStoreOptions,
+  type TouchSessionOptions,
+} from './identity.js';
+
+export {
   ServerpodTransport,
   type ServerpodTransportOptions,
 } from './transport/serverpod.js';
@@ -42,6 +67,14 @@ export {
   type SpanLinkInput,
   type SpanStatus,
 } from './transport/spans.js';
+export {
+  ANALYTICS_DEFAULT_NAMES,
+  ingestAnalyticsEventBatch,
+  MAX_ANALYTICS_BATCH,
+  serializeAnalyticsEvent,
+  type AnalyticsEventKind,
+  type IngestAnalyticsEventParams,
+} from './transport/analytics.js';
 
 export {
   DEFAULT_TRACES_SAMPLE_RATE,

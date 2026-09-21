@@ -36,6 +36,7 @@ export interface TracerOptions {
   release?: string;
   userId?: string;
   getSessionId: () => string | null;
+  getAnonymousId: () => string | null;
   getReplayId: () => string | null;
   onPermanentIngestError?: (error: unknown) => void;
 }
@@ -386,6 +387,7 @@ export class Tracer {
       environment: this.options.environment,
       release: this.options.release,
       userId: this.options.userId,
+      anonymousId: this.options.getAnonymousId() ?? undefined,
       sessionId: this.options.getSessionId() ?? undefined,
       replayId: this.options.getReplayId() ?? undefined,
     };

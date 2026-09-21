@@ -12,7 +12,7 @@ globs:
 
 ## Wire contract
 
-Events: `POST {baseUrl}/events/ingestBatch`. Spans: `POST {baseUrl}/spans/ingestBatch`. Replay (browser only): `replays/start`, `replays/ingestSegmentBatch`, `replays/finish`.
+Events: `POST {baseUrl}/events/ingestBatch`. Spans: `POST {baseUrl}/spans/ingestBatch`. Analytics: `POST {baseUrl}/analytics/ingestBatch`. Replay (browser only): `replays/start`, `replays/ingestSegmentBatch`, `replays/finish`.
 
 - Header: `X-API-Key` only
 - Serverpod envelopes with `__className__`
@@ -22,7 +22,7 @@ Events: `POST {baseUrl}/events/ingestBatch`. Spans: `POST {baseUrl}/spans/ingest
 
 Classify by JSON body `retry` + exception class, **never HTTP 401/403**.
 
-- `retry: false` or known permanent class: drop the failed call, log once, disable events **and** spans **and** replay for this process/page
+- `retry: false` or known permanent class: drop the failed call, log once, disable events **and** spans **and** replay **and** analytics for this process/page
 - Quota / rate-limit (`retry: true`) and 5xx: keep sending
 - Missing scope (`lacks required scope`): disable that signal only
 - Do not persist across process restart or a full page reload

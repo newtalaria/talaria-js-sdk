@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
+
+- Persist `anonymousId` (`talaria.anonymousId`) and rotate `sessionId` after 30 minutes idle or midnight UTC.
+- Add `Talaria.analytics` (opt-in product analytics, auto `$pageview` on History navigations, first-touch UTM). Default off.
 
 ## 0.2.1
 

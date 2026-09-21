@@ -1,0 +1,70 @@
+:root {
+  color-scheme: dark;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  background: #0b0d10;
+  color: #e8eaed;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+p,
+.status {
+  color: #9aa3ad;
+}
+
+.status {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #161a20;
+  border: 1px solid #2a313b;
+}
+
+.status.warn {
+  border-color: #8a6d1f;
+  color: #f0d27a;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.5rem 0;
+}
+
+button,
+.btn {
+  appearance: none;
+  border: 0;
+  border-radius: 0.45rem;
+  background: #3d6bff;
+  color: white;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+button.secondary,
+.btn.secondary {
+  background: #222831;
+  color: #e8eaed;
+}
+
+nav a {
+  color: #8fb0ff;
+}

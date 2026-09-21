@@ -6,6 +6,7 @@ export interface StartReplayParams {
   replayId: string;
   environment: string;
   sessionId?: string;
+  anonymousId?: string;
   url?: string;
   userId?: string;
   userAgent?: string;
@@ -46,6 +47,7 @@ export async function startReplay(
     environment: params.environment,
   };
   if (params.sessionId) input.sessionId = params.sessionId;
+  if (params.anonymousId) input.anonymousId = params.anonymousId;
   if (params.url) input.url = params.url;
   if (params.userId) input.userId = params.userId;
   if (params.userAgent) input.userAgent = params.userAgent;

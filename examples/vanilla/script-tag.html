@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Talaria script-tag example</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Talaria script-tag example</h1>
+      <p>
+        Same demo without a bundler. Loads the published IIFE from jsDelivr.
+        <a href="/">Back to the Vite page</a>.
+      </p>
+      <p id="status" class="status warn">Loading…</p>
+      <div class="actions">
+        <button type="button" id="exception" disabled>Capture exception</button>
+        <button type="button" id="message" class="secondary" disabled>Capture message</button>
+      </div>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@newtalaria/browser@0.2.0/dist/talaria.browser.iife.js"></script>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const dsn =
+        params.get('dsn') ||
+        localStorage.getItem('TALARIA_DSN') ||
+        'https://api.newtalaria.com';
+      const apiKey =
+        params.get('apiKey') || localStorage.getItem('TALARIA_API_KEY') || '';
+      const environment =
+        params.get('environment') ||
+        localStorage.getItem('TALARIA_ENVIRONMENT') ||
+        'development';
+      const status = document.getElementById('status');
+      const ready = Boolean(window.Talaria && apiKey);
+      if (ready) {
+        Talaria.init({
+          dsn: dsn,
+          apiKey: apiKey,
+          environment: environment,
+          enableTracing: true,
+          replaysOnErrorSampleRate: 1,
+        });
+        status.className = 'status';
+        status.innerHTML =
+          'Sending to <code>' + dsn + '</code>. Pass <code>?apiKey=tal_live_…</code> or set localStorage.';
+        document.getElementById('exception').disabled = false;
+        document.getElementById('message').disabled = false;
+        document.getElementById('exception').onclick = function () {
+          Talaria.captureException(new Error('script-tag captured exception'));
+        };
+        document.getElementById('message').onclick = function () {
+          Talaria.captureMessage('script-tag hello', 'info');
+        };
+      } else {
+        status.innerHTML =
+          'Set <code>localStorage.TALARIA_API_KEY</code> or open with <code>?apiKey=tal_live_…</code>. The Vite page reads <code>.env</code> instead.';
+      }
+    </script>
+  </body>
+</html>

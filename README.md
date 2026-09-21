@@ -28,6 +28,20 @@ Source: [github.com/newtalaria/talaria-js-sdk](https://github.com/newtalaria/tal
 - Tracing **off** until you opt in (`enableTracing` / `tracesSampleRate`)
 - Browser session replay (rrweb) on `@newtalaria/browser` and the React / Next client surfaces
 
+## Examples
+
+Clone this repo and install one app. Each example installs the published npm packages.
+
+```bash
+git clone https://github.com/newtalaria/talaria-js-sdk.git
+cd talaria-js-sdk/examples/vanilla   # or examples/react or examples/next
+cp .env.example .env                 # Next: .env.local
+npm install
+npm run dev
+```
+
+See [examples/README.md](examples/README.md).
+
 ## Develop
 
 ```bash

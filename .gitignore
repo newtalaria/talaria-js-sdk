@@ -4,4 +4,7 @@
 *.tsbuildinfo
 .turbo
 examples/**/vendor/
+examples/**/.env
+examples/**/.env.local
 examples/next/.next/
+examples/vanilla/public/talaria.browser.iife.js

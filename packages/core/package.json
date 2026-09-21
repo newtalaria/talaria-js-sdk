@@ -1,6 +1,6 @@
 {
   "name": "@newtalaria/core",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Shared Talaria ingest types, transport, sampling, and scope — used by browser and Node SDKs",
   "type": "module",
   "main": "./dist/index.js",

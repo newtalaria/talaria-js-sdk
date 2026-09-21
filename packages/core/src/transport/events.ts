@@ -23,6 +23,7 @@ export interface IngestEventParams {
   release?: string;
   commitSha?: string;
   userId?: string;
+  anonymousId?: string;
   sessionId?: string;
   replayId?: string | null;
   requestId?: string;
@@ -54,6 +55,7 @@ function serializeEvent(params: IngestEventParams): Record<string, unknown> {
   if (params.release) input.release = params.release;
   if (params.commitSha) input.commitSha = params.commitSha;
   if (params.userId) input.userId = params.userId;
+  if (params.anonymousId) input.anonymousId = params.anonymousId;
   if (params.sessionId) input.sessionId = params.sessionId;
   if (params.replayId) input.replayId = params.replayId;
   if (params.requestId) input.requestId = params.requestId;

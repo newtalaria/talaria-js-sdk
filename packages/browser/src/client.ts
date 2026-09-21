@@ -40,6 +40,9 @@ import { ServerpodTransport } from './transport/serverpod.js';
 import { IngestError } from './transport/ingest_error.js';
 import { ingestEventBatch } from './transport/events.js';
 import {
+  AnalyticsFacade,
+  createWebStorage,
+  IdentityStore,
   normalizeBreadcrumb,
   Scope,
   type Span,
@@ -371,6 +374,9 @@ function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
     inAppOrigins: options.inAppOrigins ?? [],
     tracingEnabled: isTracingEnabled(options),
     tracesSampleRate: resolveTracesSampleRate(options),
+    enableAnalytics: Boolean(
+      options.enableAnalytics ?? options.analyticsEnabled,
+    ),
   };
 }
 
@@ -498,6 +504,9 @@ export class TalariaClient {
   private pageloadMaxTimer: ReturnType<typeof setTimeout> | null = null;
   private pageloadCanIdle = false;
   private lastNavigationPath: string | null = null;
+  private lastAnalyticsPath: string | null = null;
+  private identity: IdentityStore | null = null;
+  private analyticsFacade: AnalyticsFacade | null = null;
 
   init(options: TalariaInitOptions): void {
     if (this.options) {
@@ -510,7 +519,14 @@ export class TalariaClient {
       baseUrl: this.options.baseUrl,
       apiKey: this.options.apiKey,
     });
-    this.sessionId = createId();
+    this.identity = new IdentityStore(createWebStorage());
+    const loc = currentLocation();
+    const referrer =
+      typeof document !== 'undefined' ? document.referrer : undefined;
+    this.sessionId = this.identity.touchSession({
+      url: loc?.href,
+      referrer: referrer || undefined,
+    });
     this.replayId = createId();
     this.closed = false;
     this.ingestDisabled = false;
@@ -530,6 +546,8 @@ export class TalariaClient {
     if (this.options.userId) this.scope.setUser({ id: this.options.userId });
     this.tracer = null;
     this.lastNavigationPath = null;
+    this.lastAnalyticsPath = null;
+    this.analyticsFacade = this.createAnalyticsFacade();
     void collectBrowserContext().then((ctx) => {
       if (this.options) this.browserContext = ctx;
     });
@@ -654,6 +672,10 @@ export class TalariaClient {
     this.startTracer();
     this.installHistoryInstrumentation();
 
+    if (this.options.enableAnalytics) {
+      this.analyticsFacade?.optIn();
+    }
+
     if (!this.options.disableDefaultIntegrations) {
       this.installGlobalHandlers();
     }
@@ -704,6 +726,80 @@ export class TalariaClient {
     return this.scope.getUserId() ?? this.options?.userId;
   }
 
+  getAnonymousId(): string | null {
+    return this.identity?.getAnonymousId() ?? null;
+  }
+
+  get analytics(): AnalyticsFacade {
+    if (!this.analyticsFacade) {
+      this.analyticsFacade = this.createAnalyticsFacade();
+    }
+    return this.analyticsFacade;
+  }
+
+  private createAnalyticsFacade(): AnalyticsFacade {
+    return new AnalyticsFacade({
+      getTransport: () => this.transport,
+      getIdentity: () => this.identity,
+      getUserId: () => this.getUserId(),
+      setUser: (user) => this.setUser(user),
+      getReplayId: () => this.getReplayId(),
+      getTraceId: () => this.getTraceId(),
+      getSpanId: () => this.getSpanId(),
+      getPlatform: () => PLATFORM_JAVASCRIPT,
+      getEnvironment: () => this.options?.environment,
+      getRelease: () => this.options?.release,
+      getPageContext: () => this.pageContext(),
+      mapScreenToPage: true,
+      logLabel: '@newtalaria/browser',
+      onPermanentError: (error) => {
+        this.disableIngestAfterPermanentError(error, 'analytics');
+      },
+      onOptIn: () => this.captureAutoPageview(),
+    });
+  }
+
+  private pageContext(): {
+    url?: string;
+    path?: string;
+    title?: string;
+    referrer?: string;
+  } {
+    const loc = currentLocation();
+    let title: string | undefined;
+    let referrer: string | undefined;
+    try {
+      if (typeof document !== 'undefined') {
+        title = document.title || undefined;
+        referrer = document.referrer || undefined;
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      url: loc?.href,
+      path: loc?.pathname,
+      title,
+      referrer,
+    };
+  }
+
+  private touchIdentity(): void {
+    if (!this.identity) return;
+    const ctx = this.pageContext();
+    this.sessionId = this.identity.touchSession({
+      url: ctx.url,
+      referrer: ctx.referrer,
+    });
+  }
+
+  private captureAutoPageview(path = this.pageContext().path || '/'): void {
+    if (!this.analyticsFacade?.isEnabled()) return;
+    if (this.lastAnalyticsPath === path) return;
+    this.lastAnalyticsPath = path;
+    this.analyticsFacade.page();
+  }
+
   addBreadcrumb(crumb: Partial<import('./types.js').Breadcrumb> & { type?: string; message?: string }): void {
     this.breadcrumbs.add(normalizeBreadcrumb(crumb));
   }
@@ -726,6 +822,7 @@ export class TalariaClient {
     if (href) this.breadcrumbs.add(navigationBreadcrumb(href, 'navigation'));
     this.tracer?.startNavigation({ name: path, url: href });
     this.schedulePageloadEnd();
+    this.captureAutoPageview(path);
   }
 
   async captureException(
@@ -960,20 +1057,24 @@ export class TalariaClient {
     const spanFlush = this.tracer
       ? this.tracer.flush({ keepalive })
       : Promise.resolve();
+    const analyticsFlush = this.analyticsFacade
+      ? this.analyticsFacade.flush({ keepalive })
+      : Promise.resolve();
 
     if (!this.transport) {
-      await spanFlush;
+      await Promise.all([spanFlush, analyticsFlush]);
       return;
     }
 
     if (!this.uploadEnabled) {
       this.buffer.trimRing();
-      await spanFlush;
+      await Promise.all([spanFlush, analyticsFlush]);
       return;
     }
 
     await Promise.all([
       spanFlush,
+      analyticsFlush,
       this.enqueueUpload(async () => {
       // May have been disabled by an earlier queued task (error clip / limit).
       if (!this.uploadEnabled || this.closed) return;
@@ -1050,6 +1151,9 @@ export class TalariaClient {
     }
     this.tracer = null;
     this.breadcrumbs.clear();
+    this.analyticsFacade = null;
+    this.identity = null;
+    this.lastAnalyticsPath = null;
 
     this.options = null;
     this.transport = null;
@@ -1114,6 +1218,8 @@ export class TalariaClient {
       throw new Error('@newtalaria/browser: call Talaria.init() first');
     }
     if (this.ingestDisabled) return;
+
+    this.touchIdentity();
 
     // Cheap gates before replay work / beforeSend.
     const respectMinLevel = args.respectMinLevel !== false;
@@ -1325,6 +1431,7 @@ export class TalariaClient {
           release: this.options.release,
           commitSha: this.options.commitSha,
           userId,
+          anonymousId: this.identity?.getAnonymousId() ?? undefined,
           sessionId: this.sessionId ?? undefined,
           replayId: replayId ?? undefined,
           url: currentLocation()?.href,
@@ -1359,7 +1466,7 @@ export class TalariaClient {
    */
   private disableIngestAfterPermanentError(
     error: unknown,
-    signal: 'events' | 'spans' | 'replay',
+    signal: 'events' | 'spans' | 'replay' | 'analytics',
   ): void {
     const parsed = IngestError.fromUnknown(error);
     if (parsed.isScopeOnly) {
@@ -1368,6 +1475,8 @@ export class TalariaClient {
         this.ingestDisabled = true;
       } else if (signal === 'spans') {
         this.tracer?.disable();
+      } else if (signal === 'analytics') {
+        this.analyticsFacade?.disable();
       } else {
         this.replayDisabled = true;
         this.uploadEnabled = false;
@@ -1379,10 +1488,25 @@ export class TalariaClient {
       );
       return;
     }
-    if (this.ingestDisabled && this.replayDisabled) return;
+    if (signal === 'analytics' && !parsed.isGlobalCredentialFailure) {
+      this.analyticsFacade?.disable();
+      console.warn(
+        '@newtalaria/browser: analytics ingest disabled after permanent client error',
+        error,
+      );
+      return;
+    }
+    if (
+      this.ingestDisabled &&
+      this.replayDisabled &&
+      !this.analyticsFacade?.isEnabled()
+    ) {
+      return;
+    }
     this.ingestDisabled = true;
     this.replayDisabled = true;
     this.tracer?.disable();
+    this.analyticsFacade?.disable();
     console.warn(
       '@newtalaria/browser: event ingest disabled after permanent client error',
       error,
@@ -1676,6 +1800,7 @@ export class TalariaClient {
       release: this.options.release,
       userId: this.getUserId(),
       getSessionId: () => this.sessionId,
+      getAnonymousId: () => this.identity?.getAnonymousId() ?? null,
       getReplayId: () => this.getReplayId(),
       onPermanentIngestError: (error) => {
         this.disableIngestAfterPermanentError(error, 'spans');
@@ -1989,6 +2114,7 @@ export class TalariaClient {
         replayId: this.replayId,
         environment: this.options.environment,
         sessionId: this.sessionId,
+        anonymousId: this.identity?.getAnonymousId() ?? undefined,
         url: currentLocation()?.href,
         userId: this.getUserId(),
         userAgent: this.browserContext?.userAgent,

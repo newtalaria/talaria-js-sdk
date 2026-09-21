@@ -31,6 +31,7 @@ export interface IngestSpanParams {
   environment?: string;
   release?: string;
   userId?: string;
+  anonymousId?: string;
   sessionId?: string;
   replayId?: string;
   requestId?: string;
@@ -86,6 +87,7 @@ function serializeSpan(span: IngestSpanParams): Record<string, unknown> {
   if (span.environment) out.environment = span.environment;
   if (span.release) out.release = span.release;
   if (span.userId) out.userId = span.userId;
+  if (span.anonymousId) out.anonymousId = span.anonymousId;
   if (span.sessionId) out.sessionId = span.sessionId;
   if (span.replayId) out.replayId = span.replayId;
   if (span.requestId) out.requestId = span.requestId;

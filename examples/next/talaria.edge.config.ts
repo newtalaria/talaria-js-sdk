@@ -1,7 +1,10 @@
 import { initEdge } from '@newtalaria/nextjs/edge';
 
-initEdge({
-  dsn: process.env.TALARIA_DSN ?? 'https://api.newtalaria.com',
-  apiKey: process.env.TALARIA_API_KEY ?? '',
-  environment: process.env.TALARIA_ENVIRONMENT ?? 'development',
-});
+const apiKey = process.env.TALARIA_API_KEY ?? '';
+if (apiKey) {
+  initEdge({
+    dsn: process.env.TALARIA_DSN ?? 'https://api.newtalaria.com',
+    apiKey,
+    environment: process.env.TALARIA_ENVIRONMENT ?? 'development',
+  });
+}

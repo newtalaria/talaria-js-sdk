@@ -26,6 +26,7 @@ describe('event batch ingest', () => {
         message: 'hello',
         environment: 'development',
         level: 'error',
+        anonymousId: 'anon-evt',
       });
       assert.match(url, /\/events\/ingestBatch$/);
       const input = body!.input as Record<string, unknown>;
@@ -34,6 +35,7 @@ describe('event batch ingest', () => {
       assert.equal(events.length, 1);
       assert.equal(events[0]!.__className__, 'IngestEventInput');
       assert.equal(events[0]!.message, 'hello');
+      assert.equal(events[0]!.anonymousId, 'anon-evt');
     } finally {
       globalThis.fetch = originalFetch;
     }

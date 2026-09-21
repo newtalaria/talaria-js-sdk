@@ -1,17 +1,10 @@
-export {
-  Talaria,
-  handleHttpRequest,
-  wrapMysql2,
-  wrapPg,
-  wrapRedis,
-} from '@newtalaria/node';
+export { Talaria } from '@newtalaria/node/api';
+export type { TalariaNodeInitOptions } from '@newtalaria/node/api';
 
-export type { TalariaNodeInitOptions } from '@newtalaria/node';
+import { Talaria } from '@newtalaria/node/api';
+import type { TalariaNodeInitOptions } from '@newtalaria/node/api';
 
-import { Talaria } from '@newtalaria/node';
-import type { TalariaNodeInitOptions } from '@newtalaria/node';
-
-/** Call from `sentry.server.config.ts`-style files or `instrumentation.ts` (nodejs). */
+/** Call from `talaria.server.config.ts` or `instrumentation.ts` (nodejs). */
 export function initServer(options: TalariaNodeInitOptions): void {
   Talaria.init(options);
 }

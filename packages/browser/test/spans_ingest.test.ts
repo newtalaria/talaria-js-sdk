@@ -32,6 +32,7 @@ describe('spans/ingestBatch transport', () => {
           endTime: '2026-01-01T00:00:01.000Z',
           status: 'ok',
           attributes: { lcp: '1200' },
+          anonymousId: 'anon-span',
           events: [
             {
               timestamp: '2026-01-01T00:00:00.500Z',
@@ -52,6 +53,7 @@ describe('spans/ingestBatch transport', () => {
       assert.equal(spans[0]!.traceId, 'a'.repeat(32));
       assert.equal(spans[0]!.kind, 'internal');
       assert.equal(spans[0]!.status, 'ok');
+      assert.equal(spans[0]!.anonymousId, 'anon-span');
       const events = spans[0]!.events as Array<Record<string, unknown>>;
       assert.equal(events[0]!.__className__, 'SpanEventDto');
       assert.equal(events[0]!.name, 'lcp');

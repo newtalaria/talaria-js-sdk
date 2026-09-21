@@ -1,5 +1,7 @@
 import {
-  createId,
+  AnalyticsFacade,
+  createMemoryStorage,
+  IdentityStore,
   ingestEventBatch,
   IngestError,
   isTracingEnabled,
@@ -18,7 +20,6 @@ import {
   type UserContext,
 } from '@newtalaria/core';
 import { SDK_NAME, SDK_VERSION } from './sdk_meta.js';
-import { instrumentOutgoingHttp } from './http.js';
 import { NodeTracer } from './tracer.js';
 import type { TalariaNodeInitOptions } from './types.js';
 
@@ -37,6 +38,8 @@ export class TalariaNodeClient {
   private tracer: NodeTracer | null = null;
   private readonly scope = new Scope();
   private sessionId: string | null = null;
+  private identity: IdentityStore | null = null;
+  private analyticsFacade: AnalyticsFacade | null = null;
   private ingestDisabled = false;
   private teardowns: Array<() => void> = [];
   private breadcrumbs: Breadcrumb[] = [];
@@ -62,7 +65,14 @@ export class TalariaNodeClient {
       baseUrl,
       apiKey: raw.apiKey,
     });
-    this.sessionId = createId();
+    this.identity = new IdentityStore(createMemoryStorage(), {
+      initialAnonymousId: raw.anonymousId,
+    });
+    this.sessionId = this.identity.touchSession();
+    this.analyticsFacade = this.createAnalyticsFacade();
+    if (raw.enableAnalytics || raw.analyticsEnabled) {
+      this.analyticsFacade.optIn();
+    }
     if (raw.userId) this.scope.setUser({ id: raw.userId });
     if (raw.tags) this.scope.setTags(raw.tags);
 
@@ -80,15 +90,11 @@ export class TalariaNodeClient {
         release: raw.release,
         getUserId: () => this.scope.getUserId(),
         getSessionId: () => this.sessionId,
+        getAnonymousId: () => this.identity?.getAnonymousId() ?? null,
         onPermanentIngestError: (error) => this.disable(error, 'spans'),
       });
-      this.teardowns.push(
-        instrumentOutgoingHttp({
-          tracer: this.tracer,
-          talariaBaseUrl: baseUrl,
-          ignoreUrls: raw.failedRequestIgnoreUrls,
-        }),
-      );
+      // Outgoing HTTP patch lives in `index.ts` so `@newtalaria/node/api`
+      // stays free of `node:http` for Next.js.
     }
 
     if (!this.options.disableDefaultIntegrations) {
@@ -98,6 +104,33 @@ export class TalariaNodeClient {
 
   setUser(user: UserContext | null): void {
     this.scope.setUser(user);
+  }
+
+  get analytics(): AnalyticsFacade {
+    if (!this.analyticsFacade) {
+      this.analyticsFacade = this.createAnalyticsFacade();
+    }
+    return this.analyticsFacade;
+  }
+
+  private createAnalyticsFacade(): AnalyticsFacade {
+    return new AnalyticsFacade({
+      getTransport: () => this.transport,
+      getIdentity: () => this.identity,
+      getUserId: () => this.scope.getUserId(),
+      setUser: (user) => this.setUser(user),
+      getReplayId: () => null,
+      getTraceId: () => this.getTraceId(),
+      getSpanId: () => this.getSpanId(),
+      getPlatform: () => PLATFORM,
+      getEnvironment: () => this.options?.environment,
+      getRelease: () => this.options?.release,
+      getPageContext: () => ({}),
+      mapScreenToPage: false,
+      requireIdentityOnTrack: true,
+      logLabel: '@newtalaria/node',
+      onPermanentError: (error) => this.disable(error, 'analytics'),
+    });
   }
 
   addBreadcrumb(crumb: Partial<Breadcrumb> & { type?: string; message?: string }): void {
@@ -134,6 +167,21 @@ export class TalariaNodeClient {
     return this.tracer;
   }
 
+  addTeardown(undo: () => void): void {
+    this.teardowns.push(undo);
+  }
+
+  getHttpInstrumentOptions(): {
+    baseUrl: string;
+    ignoreUrls?: string[];
+  } | null {
+    if (!this.options?.tracingEnabled) return null;
+    return {
+      baseUrl: this.options.baseUrl,
+      ignoreUrls: this.options.failedRequestIgnoreUrls,
+    };
+  }
+
   async captureException(error: unknown, context?: CaptureContext): Promise<void> {
     const err = error instanceof Error ? error : new Error(String(error));
     await this.send({
@@ -154,7 +202,10 @@ export class TalariaNodeClient {
   }
 
   async flush(): Promise<void> {
-    await this.tracer?.flush();
+    await Promise.all([
+      this.tracer?.flush() ?? Promise.resolve(),
+      this.analyticsFacade?.flush() ?? Promise.resolve(),
+    ]);
   }
 
   async close(): Promise<void> {
@@ -198,6 +249,7 @@ export class TalariaNodeClient {
     }
     if (level === 'error' || level === 'fatal') this.tracer?.markError();
 
+    this.sessionId = this.identity?.touchSession() ?? this.sessionId;
     const userId = args.context?.userId ?? this.scope.getUserId();
     const tags = mergeTags(this.options.tags, this.scope.getTags(), args.context?.tags);
     const extra = args.context?.extra;
@@ -233,6 +285,7 @@ export class TalariaNodeClient {
           release: this.options.release,
           commitSha: this.options.commitSha,
           userId,
+          anonymousId: this.identity?.getAnonymousId() ?? undefined,
           sessionId: this.sessionId ?? undefined,
           tags: Object.keys(tags).length ? tags : undefined,
           extraJson: extra ? JSON.stringify(extra) : undefined,
@@ -249,15 +302,21 @@ export class TalariaNodeClient {
     }
   }
 
-  private disable(error: unknown, signal: 'events' | 'spans'): void {
+  private disable(error: unknown, signal: 'events' | 'spans' | 'analytics'): void {
     const parsed = IngestError.fromUnknown(error);
     if (parsed.isScopeOnly) {
       if (signal === 'spans') this.tracer?.disable();
+      else if (signal === 'analytics') this.analyticsFacade?.disable();
       else this.ingestDisabled = true;
+      return;
+    }
+    if (signal === 'analytics' && !parsed.isGlobalCredentialFailure) {
+      this.analyticsFacade?.disable();
       return;
     }
     this.ingestDisabled = true;
     this.tracer?.disable();
+    this.analyticsFacade?.disable();
     console.warn(
       '@newtalaria/node: ingest disabled after permanent client error',
       error,

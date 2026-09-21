@@ -180,6 +180,14 @@ export interface TalariaInitOptions {
    * Error transactions are always kept. Default `0.1` when tracing is on.
    */
   tracesSampleRate?: number;
+  /**
+   * Product analytics (`POST {baseUrl}/analytics/ingestBatch`).
+   * Default `false` until `Talaria.analytics.optIn()` or this is `true`.
+   * Alias: `analyticsEnabled`.
+   */
+  enableAnalytics?: boolean;
+  /** Alias of {@link enableAnalytics}. */
+  analyticsEnabled?: boolean;
 }
 
 export interface ResolvedOptions {
@@ -219,4 +227,5 @@ export interface ResolvedOptions {
   inAppOrigins: string[];
   tracingEnabled: boolean;
   tracesSampleRate: number;
+  enableAnalytics: boolean;
 }

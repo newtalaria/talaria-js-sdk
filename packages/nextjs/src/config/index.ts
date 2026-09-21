@@ -3,9 +3,19 @@ export interface TalariaNextConfig {
   hideSourceMaps?: boolean;
 }
 
+type WebpackContext = { isServer?: boolean };
+type WebpackConfig = {
+  resolve?: {
+    alias?: Record<string, string | false>;
+    fallback?: Record<string, string | false>;
+  };
+};
+
 type NextConfig = Record<string, unknown> & {
   serverExternalPackages?: string[];
+  transpilePackages?: string[];
   productionBrowserSourceMaps?: boolean;
+  webpack?: (config: WebpackConfig, context: WebpackContext) => WebpackConfig;
 };
 
 /**
@@ -22,11 +32,37 @@ export function withTalariaConfig<T extends NextConfig>(
     '@newtalaria/node',
     '@newtalaria/core',
   ]);
+  const transpile = new Set([
+    ...(nextConfig.transpilePackages ?? []),
+    '@newtalaria/nextjs',
+    '@newtalaria/react',
+    '@newtalaria/browser',
+  ]);
+  const previousWebpack = nextConfig.webpack;
   return {
     ...nextConfig,
     serverExternalPackages: [...externals],
+    transpilePackages: [...transpile],
     productionBrowserSourceMaps: hide
       ? false
       : nextConfig.productionBrowserSourceMaps,
+    webpack(config: WebpackConfig, context: WebpackContext) {
+      if (!context.isServer) {
+        config.resolve = config.resolve ?? {};
+        config.resolve.alias = {
+          ...config.resolve.alias,
+          '@newtalaria/node': false,
+          '@newtalaria/node/api': false,
+        };
+        config.resolve.fallback = {
+          ...config.resolve.fallback,
+          http: false,
+          https: false,
+          net: false,
+          tls: false,
+        };
+      }
+      return previousWebpack ? previousWebpack(config, context) : config;
+    },
   };
 }

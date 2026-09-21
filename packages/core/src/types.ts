@@ -150,7 +150,19 @@ export interface CoreInitOptions {
   ) => BeforeSendEvent | null;
   ignoreErrors?: Array<string | RegExp>;
   userId?: string;
+  /**
+   * Durable visitor id. Browser persists this in `localStorage`; Node generates
+   * per-process unless this is set.
+   */
+  anonymousId?: string;
   tags?: Record<string, string>;
   enableTracing?: boolean;
   tracesSampleRate?: number;
+  /**
+   * Product analytics (`analytics/ingestBatch`). Default `false` until
+   * `Talaria.analytics.optIn()` or this is `true`. Alias: `analyticsEnabled`.
+   */
+  enableAnalytics?: boolean;
+  /** Alias of {@link enableAnalytics}. */
+  analyticsEnabled?: boolean;
 }

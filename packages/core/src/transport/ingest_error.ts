@@ -1,5 +1,5 @@
 /** Which ingest path a permanent error applies to. */
-export type IngestSignal = 'events' | 'spans' | 'replay';
+export type IngestSignal = 'events' | 'spans' | 'replay' | 'analytics';
 
 /** Thrown by {@link ServerpodTransport} when an ingest RPC fails. */
 export class TransportError extends Error {
@@ -99,6 +99,25 @@ export class IngestError {
   /** Missing a single scope — disable that signal only. */
   get isScopeOnly(): boolean {
     return (this.message ?? '').toLowerCase().includes('lacks required scope');
+  }
+
+  /**
+   * Dead API key / origin / missing project. Always disable every ingest
+   * signal. Other `retry: false` bodies (e.g. analytics disabled on the
+   * project) stay scoped to the failing path.
+   */
+  get isGlobalCredentialFailure(): boolean {
+    const name = this.className ?? '';
+    if (name.includes('ApiUnauthorizedException')) return true;
+    if (name.includes('ApiDisallowedDomainException')) return true;
+    if (name.includes('ApiNotFoundException')) return true;
+    if (
+      name.includes('ApiConflictException') &&
+      (this.message ?? '').toLowerCase().includes('not active')
+    ) {
+      return true;
+    }
+    return false;
   }
 }
 

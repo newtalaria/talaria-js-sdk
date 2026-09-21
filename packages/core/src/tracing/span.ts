@@ -138,6 +138,7 @@ export function toIngestSpan(
     environment?: string;
     release?: string;
     userId?: string;
+    anonymousId?: string;
     sessionId?: string;
     replayId?: string;
   },
@@ -158,6 +159,7 @@ export function toIngestSpan(
     environment: extras.environment,
     release: extras.release,
     userId: extras.userId,
+    anonymousId: extras.anonymousId,
     sessionId: extras.sessionId,
     replayId: extras.replayId,
   };
