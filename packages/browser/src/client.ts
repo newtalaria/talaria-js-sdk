@@ -106,6 +106,7 @@ import {
   networkBreadcrumb,
 } from './tracing/breadcrumbs.js';
 import {
+  isNoisyBrowserSpanUrl,
   isTalariaIngestUrl,
   shouldInjectTraceparent,
 } from './tracing/instrument_http.js';
@@ -117,7 +118,10 @@ import { formatTraceparent } from './tracing/traceparent.js';
 import { Tracer } from './tracing/tracer.js';
 
 const PLATFORM_JAVASCRIPT = 'javascript';
-const PAGELOAD_FINALIZE_MS = 10_000;
+/** End the pageload/navigation root this long after the last child span. */
+const TRANSACTION_IDLE_MS = 2_000;
+/** Hard cap so a chatty page cannot keep one transaction open forever. */
+const TRANSACTION_MAX_MS = 30_000;
 
 function currentLocation(): { origin?: string; href?: string; pathname?: string } | undefined {
   try {
@@ -490,7 +494,9 @@ export class TalariaClient {
   private tracer: Tracer | null = null;
   private breadcrumbs = new BreadcrumbBuffer();
   private scope = new Scope();
-  private pageloadTimer: ReturnType<typeof setTimeout> | null = null;
+  private pageloadIdleTimer: ReturnType<typeof setTimeout> | null = null;
+  private pageloadMaxTimer: ReturnType<typeof setTimeout> | null = null;
+  private pageloadCanIdle = false;
   private lastNavigationPath: string | null = null;
 
   init(options: TalariaInitOptions): void {
@@ -573,12 +579,18 @@ export class TalariaClient {
           ) {
             return;
           }
+          if (isNoisyBrowserSpanUrl(meta.url || '')) {
+            return;
+          }
           this.breadcrumbs.add(networkBreadcrumb(meta));
           if (this.tracer) {
             this.tracer.recordHttpSpan(meta, {
               includeQuery: this.options?.includeNetworkUrlQuery,
               pageOrigin: currentLocation()?.origin,
             });
+            if (this.tracer.isTransactionOpen()) {
+              this.armPageloadIdleTimer();
+            }
           }
           if (
             (meta.failureKind === 'network' || meta.failureKind === 'timeout') &&
@@ -1004,7 +1016,7 @@ export class TalariaClient {
 
     this.clearErrorClipTimer();
     this.clearMaxDurationTimer();
-    this.clearPageloadTimer();
+    this.clearPageloadTimers();
 
     if (this.flushTimer) {
       clearInterval(this.flushTimer);
@@ -1173,6 +1185,11 @@ export class TalariaClient {
     const isErrorLike = level === 'error' || level === 'fatal';
     if (isErrorLike) {
       this.tracer?.markError();
+      if (this.tracer?.isTransactionOpen()) {
+        this.clearPageloadTimers();
+        this.tracer.noteActivity(occurredAt);
+        this.tracer.endPageload(occurredAt);
+      }
     }
     let errorClipOutcome: ReplayCaptureOutcome | null = null;
     let attemptedErrorClip = false;
@@ -1668,6 +1685,9 @@ export class TalariaClient {
     this.teardowns.push(
       installWebVitals((vital) => {
         this.tracer?.recordWebVital(vital);
+        if (this.tracer?.isTransactionOpen()) {
+          this.armPageloadIdleTimer();
+        }
       }),
     );
 
@@ -1703,32 +1723,62 @@ export class TalariaClient {
   }
 
   private schedulePageloadEnd(): void {
-    this.clearPageloadTimer();
-    const finalize = () => {
-      this.pageloadTimer = setTimeout(() => {
-        this.pageloadTimer = null;
-        this.tracer?.endPageload();
-        void this.tracer?.flush();
-      }, PAGELOAD_FINALIZE_MS);
+    this.clearPageloadTimers();
+    this.pageloadCanIdle = false;
+    this.armPageloadMaxTimer();
+    const armIdle = () => {
+      this.pageloadCanIdle = true;
+      this.tracer?.noteActivity();
+      this.armPageloadIdleTimer();
     };
     if (typeof document !== 'undefined' && document.readyState === 'complete') {
-      finalize();
+      armIdle();
       return;
     }
     if (typeof window !== 'undefined') {
-      window.addEventListener('load', finalize, { once: true });
+      window.addEventListener('load', armIdle, { once: true });
       this.teardowns.push(() => {
-        window.removeEventListener('load', finalize);
+        window.removeEventListener('load', armIdle);
       });
     } else {
-      finalize();
+      armIdle();
     }
   }
 
-  private clearPageloadTimer(): void {
-    if (this.pageloadTimer) {
-      clearTimeout(this.pageloadTimer);
-      this.pageloadTimer = null;
+  private armPageloadIdleTimer(): void {
+    if (!this.pageloadCanIdle || !this.tracer?.isTransactionOpen()) return;
+    if (this.pageloadIdleTimer) {
+      clearTimeout(this.pageloadIdleTimer);
+      this.pageloadIdleTimer = null;
+    }
+    this.pageloadIdleTimer = setTimeout(() => {
+      this.pageloadIdleTimer = null;
+      this.finalizeOpenTransaction();
+    }, TRANSACTION_IDLE_MS);
+  }
+
+  private armPageloadMaxTimer(): void {
+    if (this.pageloadMaxTimer) return;
+    this.pageloadMaxTimer = setTimeout(() => {
+      this.pageloadMaxTimer = null;
+      this.finalizeOpenTransaction({ useNow: true });
+    }, TRANSACTION_MAX_MS);
+  }
+
+  private finalizeOpenTransaction(opts?: { useNow?: boolean }): void {
+    this.clearPageloadTimers();
+    this.tracer?.endPageload(opts?.useNow ? new Date() : undefined);
+    void this.tracer?.flush();
+  }
+
+  private clearPageloadTimers(): void {
+    if (this.pageloadIdleTimer) {
+      clearTimeout(this.pageloadIdleTimer);
+      this.pageloadIdleTimer = null;
+    }
+    if (this.pageloadMaxTimer) {
+      clearTimeout(this.pageloadMaxTimer);
+      this.pageloadMaxTimer = null;
     }
   }
 

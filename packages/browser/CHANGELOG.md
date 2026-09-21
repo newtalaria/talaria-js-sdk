@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+## 0.2.1
+
+- End pageload and SPA navigation transactions on idle (2s after the last child, 30s max) instead of padding every root to 10s.
+- Stop attaching automatic HTTP / Web Vital spans after the transaction has ended.
+- Drop Next.js RSC/prefetch (`__next.*`, `/_next/`) and Cloudflare `/cdn-cgi/` from auto HTTP spans and breadcrumbs.
+- Errors while a transaction is still open cancel idle and end the root at the error time; later errors only correlate via the last `traceId`/`spanId`.
+
 ## 0.2.0
 
 - Extract shared ingest/transport into `@newtalaria/core`.

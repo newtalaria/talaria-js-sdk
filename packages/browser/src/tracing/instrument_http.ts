@@ -43,3 +43,25 @@ export function isTalariaIngestUrl(
   );
   return urlMatchesIgnoreList(rawUrl, ignore);
 }
+
+/**
+ * Framework / CDN telemetry that is not a product HTTP call.
+ * Next.js App Router prefetch (`__next.*` RSC, `/_next/`) and Cloudflare RUM
+ * would otherwise keep a navigation transaction open and flood the waterfall.
+ */
+export function isNoisyBrowserSpanUrl(rawUrl: string): boolean {
+  if (!rawUrl) return false;
+  let path = rawUrl;
+  try {
+    const parsed = new URL(rawUrl, 'http://local.invalid');
+    path = `${parsed.pathname}${parsed.search}`;
+  } catch {
+    // keep raw
+  }
+  const lower = path.toLowerCase();
+  return (
+    lower.includes('/cdn-cgi/') ||
+    lower.includes('/_next/') ||
+    lower.includes('__next.')
+  );
+}

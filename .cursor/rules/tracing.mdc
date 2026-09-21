@@ -1,0 +1,21 @@
+---
+description: Browser pageload and SPA navigation transaction lifetime
+globs:
+  - "packages/browser/src/tracing/**"
+  - "packages/browser/src/client.ts"
+  - "packages/nextjs/src/client/**"
+---
+
+# Browser tracing
+
+Pageload and SPA navigation roots measure **route work**, not time-on-page.
+
+- `endPageload(endTime ?? lastActivity)` — last meaningful child, never a fixed pad.
+- Idle **2s** (`TRANSACTION_IDLE_MS`). Max **30s** (`TRANSACTION_MAX_MS`).
+- Do not reintroduce `PAGELOAD_FINALIZE_MS` or `endPageload()` at `Date.now()` after a delay.
+- After the root ends: no automatic HTTP or late Web Vital children. Keep last `traceId`/`spanId` for error correlation.
+- Error while open: `markError()` overwrites `ok`, cancel idle, end at the error time.
+- Error after idle: stamp event ids only; do not reopen or extend duration.
+- Drop `__next.*`, `/_next/`, `/cdn-cgi/` from auto spans and breadcrumbs. Keep real page/API fetches.
+- `isTalariaIngestUrl` first — never wrap ingest with tracing.
+- Each pathname change = new transaction + new `traceId`. Next client also listens for `popstate` + Navigation API `currentchange`.

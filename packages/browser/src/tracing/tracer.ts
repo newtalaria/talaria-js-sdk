@@ -53,6 +53,7 @@ export class Tracer {
   private hasError = false;
   private spanCount = 0;
   private pageload: RecordingSpan | null = null;
+  private lastActivity: Date | null = null;
   private readonly ended: RecordingSpan[] = [];
   private flushChain: Promise<void> = Promise.resolve();
   private disabled = false;
@@ -82,6 +83,14 @@ export class Tracer {
     return getCurrentSpanContext();
   }
 
+  isTransactionOpen(): boolean {
+    return !!this.pageload && !this.pageload.isEnded();
+  }
+
+  noteActivity(at = new Date()): void {
+    this.lastActivity = at;
+  }
+
   markError(): void {
     this.hasError = true;
     const ctx = getCurrentSpanContext();
@@ -93,7 +102,9 @@ export class Tracer {
         ...this.pageload.data.context,
         sampled: true,
       };
-      if (this.pageload.data.status === 'unset') {
+      // Open roots must become error even if idle already stamped ok.
+      // Ended roots stay as-is — late errors only correlate via last ids.
+      if (!this.pageload.isEnded()) {
         this.pageload.setStatus('error');
       }
     }
@@ -114,6 +125,7 @@ export class Tracer {
     this.hasError = false;
     this.spanCount = 0;
     this.ended.length = 0;
+    this.lastActivity = new Date();
 
     const ctx: SpanContext = {
       traceId,
@@ -175,6 +187,7 @@ export class Tracer {
     this.hasError = false;
     this.spanCount = 0;
     this.ended.length = 0;
+    this.lastActivity = new Date();
 
     const ctx: SpanContext = {
       traceId,
@@ -203,6 +216,7 @@ export class Tracer {
     meta: NetworkMeta,
     opts?: { includeQuery?: boolean; pageOrigin?: string },
   ): void {
+    if (this.pageload?.isEnded()) return;
     const parent = getCurrentSpanContext();
     if (!parent) return;
     if (this.spanCount >= MAX_SPANS_PER_TRANSACTION) return;
@@ -251,6 +265,7 @@ export class Tracer {
       span.setStatus('unset');
     }
     span.end();
+    this.noteActivity();
   }
 
   recordWebVital(vital: WebVital): void {
@@ -259,8 +274,10 @@ export class Tracer {
     if (this.pageload && !this.pageload.data.flushed) {
       this.pageload.setAttribute(vital.name, value);
       this.pageload.addEvent(vital.name, attrs);
+      if (!this.pageload.isEnded()) this.noteActivity();
       return;
     }
+    if (this.pageload?.isEnded()) return;
     const child = this.startSpan(`webvital.${vital.name}`, {
       kind: 'internal',
       attributes: attrs,
@@ -268,12 +285,15 @@ export class Tracer {
     child?.end();
   }
 
-  endPageload(): void {
+  endPageload(endTime?: Date): void {
     if (!this.pageload || this.pageload.isEnded()) return;
     if (this.pageload.data.status === 'unset' && this.isSampled() && !this.hasError) {
       this.pageload.setStatus('ok');
     }
-    this.pageload.end();
+    const start = this.pageload.data.startTime;
+    let end = endTime ?? this.lastActivity ?? new Date();
+    if (end.getTime() < start.getTime()) end = start;
+    this.pageload.end(end);
   }
 
   flush(opts?: { keepalive?: boolean }): Promise<void> {

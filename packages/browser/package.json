@@ -1,6 +1,6 @@
 {
   "name": "@newtalaria/browser",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Talaria browser SDK — error capture, session replay (rrweb), and tracing",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,16 +19,15 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --format=esm --platform=browser --outdir=dist --splitting --sourcemap && npm run build:iife && npm run copy:example",
+    "build": "tsc -p tsconfig.json && esbuild src/index.ts --bundle --format=esm --platform=browser --outdir=dist --splitting --sourcemap && npm run build:iife",
     "build:iife": "esbuild src/iife.ts --bundle --format=iife --platform=browser --outfile=dist/talaria.browser.iife.js --sourcemap",
-    "copy:example": "mkdir -p ../../examples/sdk-spa/vendor && cp dist/index.js ../../examples/sdk-spa/vendor/talaria.js && cp dist/index.js.map ../../examples/sdk-spa/vendor/talaria.js.map",
     "build:types": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "test": "esbuild test/*.test.ts --bundle --platform=node --format=esm --outdir=test/dist && node --test test/dist/*.test.js",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@newtalaria/core": "*",
+    "@newtalaria/core": "^0.2.0",
     "rrweb": "^2.0.1"
   },
   "devDependencies": {

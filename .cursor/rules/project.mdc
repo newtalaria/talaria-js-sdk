@@ -21,6 +21,7 @@ Browser only: rrweb → replays/start|ingestSegmentBatch|finish
 - Always batch ingest
 - Never wrap `ServerpodTransport` with tracing middleware
 - Tracing off until `enableTracing` / `tracesSampleRate`
+- Browser pageload / navigation roots are idle spans — see `tracing.mdc`
 
 ## Package map
 

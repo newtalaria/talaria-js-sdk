@@ -22,21 +22,30 @@ import type { TalariaInitOptions } from '@newtalaria/react';
 /**
  * Call from `instrumentation-client.ts`.
  * Records App Router navigations when `location` changes after init.
+ * The browser SDK already wraps `history.pushState` / `replaceState`;
+ * this also covers `popstate` and the Navigation API if Next.js bypasses History.
  */
 export function initClient(options: TalariaInitOptions): void {
   Talaria.init(options);
-  if (typeof window === 'undefined') return;
-  let last = window.location.pathname;
+  const win = globalThis.window;
+  if (typeof win === 'undefined') return;
+  let last = win.location.pathname;
   const notify = () => {
-    const path = window.location.pathname;
+    const path = win.location.pathname;
     if (path === last) return;
     last = path;
     Talaria.startNavigation({
       name: path,
-      url: window.location.href,
+      url: win.location.href,
     });
   };
-  window.addEventListener('popstate', notify);
+  win.addEventListener('popstate', notify);
+  const navigation = (
+    win as Window & {
+      navigation?: { addEventListener?: (type: string, listener: () => void) => void };
+    }
+  ).navigation;
+  navigation?.addEventListener?.('currentchange', notify);
 }
 
 export default Talaria;
