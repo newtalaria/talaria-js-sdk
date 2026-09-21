@@ -1,17 +1,18 @@
 ---
-description: Browser SDK HTTP transport and ingest kill-switch rules
+description: JS SDK HTTP transport and ingest kill-switch rules
 globs:
-  - "src/transport/**"
-  - "src/client.ts"
-  - "src/tracing/tracer.ts"
-  - "test/**"
+  - "packages/*/src/transport/**"
+  - "packages/core/src/**"
+  - "packages/browser/src/client.ts"
+  - "packages/node/src/**"
+  - "packages/*/test/**"
 ---
 
 # Transport
 
 ## Wire contract
 
-Events: `POST {baseUrl}/events/ingest` (and batch when used). Spans: `POST {baseUrl}/spans/ingestBatch`. Replay: `replays/start`, `replays/ingestSegment`, `replays/finish`.
+Events: `POST {baseUrl}/events/ingestBatch`. Spans: `POST {baseUrl}/spans/ingestBatch`. Replay (browser only): `replays/start`, `replays/ingestSegmentBatch`, `replays/finish`.
 
 - Header: `X-API-Key` only
 - Serverpod envelopes with `__className__`
@@ -19,9 +20,9 @@ Events: `POST {baseUrl}/events/ingest` (and batch when used). Spans: `POST {base
 
 ## Permanent ingest disable
 
-Classify by JSON body `retry` + exception class, **never HTTP 401/403** (Serverpod maps ingest `ApiUnauthorizedException` to HTTP 400).
+Classify by JSON body `retry` + exception class, **never HTTP 401/403**.
 
-- `retry: false` or known permanent class (`ApiUnauthorizedException`, `ApiDisallowedDomainException`, `ApiNotFoundException`, inactive project): drop the failed call, log once, disable events **and** spans **and** replay for this page lifetime
+- `retry: false` or known permanent class: drop the failed call, log once, disable events **and** spans **and** replay for this process/page
 - Quota / rate-limit (`retry: true`) and 5xx: keep sending
 - Missing scope (`lacks required scope`): disable that signal only
-- Do not persist across a full page reload — a rotated key must work after deploy
+- Do not persist across process restart or a full page reload

@@ -1,0 +1,79 @@
+{
+  "name": "@newtalaria/nextjs",
+  "version": "0.1.0",
+  "description": "Talaria SDK for Next.js — client, server, and edge entrypoints",
+  "type": "module",
+  "main": "./dist/client/index.js",
+  "types": "./dist/client/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/client/index.d.ts",
+      "react-server": "./dist/server/index.js",
+      "edge-light": "./dist/edge/index.js",
+      "browser": "./dist/client/index.js",
+      "node": "./dist/server/index.js",
+      "import": "./dist/client/index.js",
+      "default": "./dist/client/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js",
+      "default": "./dist/client/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
+    },
+    "./edge": {
+      "types": "./dist/edge/index.d.ts",
+      "import": "./dist/edge/index.js",
+      "default": "./dist/edge/index.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js",
+      "default": "./dist/config/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "test": "esbuild test/*.test.ts --bundle --platform=node --format=esm --outdir=test/dist && node --test test/dist/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@newtalaria/core": "*",
+    "@newtalaria/node": "*",
+    "@newtalaria/react": "*"
+  },
+  "peerDependencies": {
+    "next": "^14.0.0 || ^15.0.0 || ^16.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  },
+  "sideEffects": false,
+  "license": "MIT",
+  "keywords": [
+    "talaria",
+    "nextjs",
+    "error-tracking",
+    "tracing"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/newtalaria/talaria-js-sdk.git",
+    "directory": "packages/nextjs"
+  },
+  "homepage": "https://www.newtalaria.com/docs/sdk/nextjs",
+  "publishConfig": {
+    "access": "public"
+  }
+}

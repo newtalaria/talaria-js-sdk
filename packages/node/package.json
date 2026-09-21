@@ -1,0 +1,65 @@
+{
+  "name": "@newtalaria/node",
+  "version": "0.1.0",
+  "description": "Talaria SDK for Node.js — process errors, incoming/outgoing HTTP, optional APM",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "test": "esbuild test/*.test.ts --bundle --platform=node --format=esm --outdir=test/dist && node --test test/dist/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@newtalaria/core": "*"
+  },
+  "peerDependencies": {
+    "ioredis": ">=5",
+    "mysql2": ">=3",
+    "pg": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "pg": { "optional": true },
+    "mysql2": { "optional": true },
+    "ioredis": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "license": "MIT",
+  "keywords": [
+    "talaria",
+    "nodejs",
+    "error-tracking",
+    "tracing",
+    "apm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/newtalaria/talaria-js-sdk.git",
+    "directory": "packages/node"
+  },
+  "homepage": "https://www.newtalaria.com/docs/sdk/node",
+  "publishConfig": {
+    "access": "public"
+  }
+}

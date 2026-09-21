@@ -1,0 +1,50 @@
+{
+  "name": "@newtalaria/core",
+  "version": "0.1.0",
+  "description": "Shared Talaria ingest types, transport, sampling, and scope — used by browser and Node SDKs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "test": "esbuild test/*.test.ts --bundle --platform=node --format=esm --outdir=test/dist && node --test test/dist/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  },
+  "sideEffects": false,
+  "license": "MIT",
+  "keywords": [
+    "talaria",
+    "error-tracking",
+    "tracing",
+    "apm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/newtalaria/talaria-js-sdk.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/newtalaria/talaria-js-sdk/tree/main/packages/core",
+  "bugs": {
+    "url": "https://github.com/newtalaria/talaria-js-sdk/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

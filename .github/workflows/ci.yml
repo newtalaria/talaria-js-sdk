@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  packages:
+    name: ${{ matrix.workspace }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace:
+          - "@newtalaria/core"
+          - "@newtalaria/browser"
+          - "@newtalaria/node"
+          - "@newtalaria/react"
+          - "@newtalaria/nextjs"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Build workspace deps
+        run: npm run build -w @newtalaria/core && npm run build -w @newtalaria/browser
+      - name: Test
+        run: npm run test -w ${{ matrix.workspace }}

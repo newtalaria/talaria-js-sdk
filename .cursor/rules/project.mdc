@@ -1,0 +1,41 @@
+---
+description: Talaria JavaScript SDK monorepo conventions
+alwaysApply: true
+---
+
+# Talaria JavaScript SDK
+
+npm workspaces. Published packages: `@newtalaria/browser`, `@newtalaria/core`, `@newtalaria/node`, `@newtalaria/react`, `@newtalaria/nextjs`.
+
+## Role
+
+```
+App → Talaria.init
+        ├─ capture* / logger     → POST /events/ingestBatch
+        └─ Tracer (optional APM) → POST /spans/ingestBatch
+Browser only: rrweb → replays/start|ingestSegmentBatch|finish
+```
+
+- Fingerprinting is **server-side only**
+- Auth: `X-API-Key` (`tal_live_…`)
+- Always batch ingest
+- Never wrap `ServerpodTransport` with tracing middleware
+- Tracing off until `enableTracing` / `tracesSampleRate`
+
+## Package map
+
+| Path | npm | Role |
+| ---- | --- | ---- |
+| `packages/core/` | `@newtalaria/core` | Isomorphic types, transport, sampling, scope |
+| `packages/browser/` | `@newtalaria/browser` | DOM, replay, fetch/XHR, vitals, History |
+| `packages/node/` | `@newtalaria/node` | Process + HTTP in/out |
+| `packages/react/` | `@newtalaria/react` | ErrorBoundary, Profiler, React Router |
+| `packages/nextjs/` | `@newtalaria/nextjs` | Client / server / edge / config |
+
+## Explicit don'ts
+
+- Do not import `react` or `next` from `packages/core`
+- Do not import Node `http` from `packages/browser` or `packages/react`
+- Do not pull `@newtalaria/node` into `@newtalaria/nextjs/client`
+- Do not compute fingerprints
+- Do not call `events/ingest` — always `ingestBatch`

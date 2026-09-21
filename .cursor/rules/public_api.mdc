@@ -1,0 +1,14 @@
+---
+description: Public JS SDK API boundaries
+globs:
+  - "packages/*/src/index.ts"
+  - "packages/nextjs/src/**/index.ts"
+---
+
+# Public API
+
+- `@newtalaria/core` is not a documented install target
+- `@newtalaria/react` and `@newtalaria/nextjs` re-export their runtime
+- Next.js consumers import `/client`, `/server`, `/edge`, `/config` — never mix Node `http` into the client graph
+- Additive APIs only on `@newtalaria/browser` (Silverstripe CDN pin)
+- Tracing default off
