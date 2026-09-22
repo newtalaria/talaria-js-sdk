@@ -25,6 +25,7 @@ export {
   type AnalyticsBindings,
   type AnalyticsCallOptions,
   type AnalyticsPageContext,
+  type AnalyticsRuntimeContext,
 } from './analytics.js';
 
 export {

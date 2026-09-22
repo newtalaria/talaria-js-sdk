@@ -47,6 +47,12 @@ describe('analytics ingest serialization', () => {
           referrer: 'https://google.com/',
           utmSource: 'google',
           propertiesJson: JSON.stringify({ product_id: '123', price: 129.99 }),
+          browserName: 'Chrome',
+          browserVersion: '126',
+          osName: 'macOS',
+          device: 'desktop',
+          timezone: 'Pacific/Auckland',
+          botKind: 'human',
         },
       ]);
 
@@ -62,6 +68,11 @@ describe('analytics ingest serialization', () => {
       assert.equal(events[0]!.sessionId, 'sess-1');
       assert.equal(events[0]!.userId, 'user_123');
       assert.equal(events[0]!.utmSource, 'google');
+      assert.equal(events[0]!.browserName, 'Chrome');
+      assert.equal(events[0]!.browserVersion, '126');
+      assert.equal(events[0]!.device, 'desktop');
+      assert.equal(events[0]!.timezone, 'Pacific/Auckland');
+      assert.equal(events[0]!.userAgent, undefined);
       assert.equal(
         events[0]!.propertiesJson,
         JSON.stringify({ product_id: '123', price: 129.99 }),
@@ -100,6 +111,8 @@ describe('analytics ingest serialization', () => {
     });
     assert.equal(serialized.userId, undefined);
     assert.equal(serialized.propertiesJson, undefined);
+    assert.equal(serialized.browserName, undefined);
+    assert.equal(serialized.userAgent, undefined);
     assert.equal(serialized.__className__, 'IngestAnalyticsEventInput');
   });
 });

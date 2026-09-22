@@ -37,6 +37,21 @@ export interface IngestAnalyticsEventParams {
   utmTerm?: string;
   utmContent?: string;
   propertiesJson?: string;
+  browserName?: string;
+  browserVersion?: string;
+  browserEngine?: string;
+  osName?: string;
+  osVersion?: string;
+  device?: string;
+  locale?: string;
+  timezone?: string;
+  webview?: boolean;
+  webviewHost?: string;
+  bot?: boolean;
+  botName?: string;
+  botKind?: string;
+  webdriver?: boolean;
+  userAgent?: string;
 }
 
 export function serializeAnalyticsEvent(
@@ -69,6 +84,21 @@ export function serializeAnalyticsEvent(
   if (params.utmTerm) out.utmTerm = params.utmTerm;
   if (params.utmContent) out.utmContent = params.utmContent;
   if (params.propertiesJson) out.propertiesJson = params.propertiesJson;
+  if (params.browserName) out.browserName = params.browserName;
+  if (params.browserVersion) out.browserVersion = params.browserVersion;
+  if (params.browserEngine) out.browserEngine = params.browserEngine;
+  if (params.osName) out.osName = params.osName;
+  if (params.osVersion) out.osVersion = params.osVersion;
+  if (params.device) out.device = params.device;
+  if (params.locale) out.locale = params.locale;
+  if (params.timezone) out.timezone = params.timezone;
+  if (params.webview === true) out.webview = true;
+  if (params.webviewHost) out.webviewHost = params.webviewHost;
+  if (params.bot === true) out.bot = true;
+  if (params.botName) out.botName = params.botName;
+  if (params.botKind) out.botKind = params.botKind;
+  if (params.webdriver === true) out.webdriver = true;
+  if (params.userAgent) out.userAgent = params.userAgent;
   return out;
 }
 

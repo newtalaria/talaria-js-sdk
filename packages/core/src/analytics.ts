@@ -27,6 +27,23 @@ export interface AnalyticsPageContext {
   referrer?: string;
 }
 
+export interface AnalyticsRuntimeContext {
+  browserName?: string;
+  browserVersion?: string;
+  browserEngine?: string;
+  osName?: string;
+  osVersion?: string;
+  device?: string;
+  locale?: string;
+  timezone?: string;
+  webview?: boolean;
+  webviewHost?: string;
+  bot?: boolean;
+  botName?: string;
+  botKind?: string;
+  webdriver?: boolean;
+}
+
 export interface AnalyticsBindings {
   getTransport: () => ServerpodTransport | null;
   getIdentity: () => IdentityStore | null;
@@ -40,6 +57,8 @@ export interface AnalyticsBindings {
   getRelease: () => string | undefined;
   /** Raw page URL / referrer (UTM parsed before sanitizing the wire fields). */
   getPageContext: () => AnalyticsPageContext;
+  /** Parsed browser / device / traffic class. Never include raw UA here. */
+  getRuntimeContext?: () => AnalyticsRuntimeContext | undefined;
   /** Web maps `screen()` to a page event. */
   mapScreenToPage: boolean;
   /** Node: skip track/identify when neither userId nor anonymousId is present. */
@@ -209,6 +228,7 @@ export class AnalyticsFacade {
     if (!anonymousId || !sessionId) return;
 
     const firstTouch = identity.getFirstTouch();
+    const runtime = this.bindings.getRuntimeContext?.();
     const event: IngestAnalyticsEventParams = {
       eventId: this.makeId(),
       name,
@@ -233,6 +253,20 @@ export class AnalyticsFacade {
       utmTerm: firstTouch.utmTerm,
       utmContent: firstTouch.utmContent,
       propertiesJson: stringifyProperties(properties),
+      browserName: runtime?.browserName,
+      browserVersion: runtime?.browserVersion,
+      browserEngine: runtime?.browserEngine,
+      osName: runtime?.osName,
+      osVersion: runtime?.osVersion,
+      device: runtime?.device,
+      locale: runtime?.locale,
+      timezone: runtime?.timezone,
+      webview: runtime?.webview,
+      webviewHost: runtime?.webviewHost,
+      bot: runtime?.bot,
+      botName: runtime?.botName,
+      botKind: runtime?.botKind,
+      webdriver: runtime?.webdriver,
     };
     this.queue.push(event);
     void this.flush();

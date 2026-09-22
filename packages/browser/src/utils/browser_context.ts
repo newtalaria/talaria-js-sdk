@@ -1,3 +1,10 @@
+export type TrafficKind =
+  | 'human'
+  | 'crawler'
+  | 'ai_crawler'
+  | 'ai_agent'
+  | 'automation';
+
 export interface BrowserContext {
   /** e.g. Chrome, Firefox, Safari, Edge, Opera, Samsung Internet, unknown */
   name: string;
@@ -11,10 +18,14 @@ export interface BrowserContext {
   device: string;
   language: string;
   userAgent: string;
-  /** True when UA looks like a crawler / headless fetcher. */
+  /** True when UA looks like a crawler, agent, or headless fetcher. */
   bot: boolean;
-  /** Friendly crawler name when recognized (e.g. Baiduspider). */
+  /** Friendly crawler / agent name when recognized (e.g. Baiduspider). */
   botName?: string;
+  /** Traffic class used by product analytics. */
+  botKind: TrafficKind;
+  /** True when `navigator.webdriver` is set. */
+  webdriver: boolean;
   /** True when the page is inside an in-app / embedded WebView. */
   webview: boolean;
   /** Host application when [webview] is true (Instagram, Facebook, …). */
@@ -36,32 +47,59 @@ export type BrowserContextTags = {
   'webview.version'?: string;
   bot?: string;
   'bot.name'?: string;
+  'bot.kind'?: string;
 } & Record<string, string>;
 
-/** Known crawlers — prefer specific names before the generic bot/spider fallback. */
-const BOT_RULES: Array<{ name: string; re: RegExp }> = [
-  { name: 'Baiduspider', re: /Baiduspider/i },
-  { name: 'Googlebot', re: /Googlebot/i },
-  { name: 'Bingbot', re: /bingbot/i },
-  { name: 'DuckDuckBot', re: /DuckDuckBot/i },
-  { name: 'YandexBot', re: /Yandex(Bot|Images)/i },
-  { name: 'Applebot', re: /Applebot/i },
-  { name: 'facebookexternalhit', re: /facebookexternalhit|Facebot/i },
-  { name: 'Twitterbot', re: /Twitterbot/i },
-  { name: 'LinkedInBot', re: /LinkedInBot/i },
-  { name: 'Slackbot', re: /Slackbot/i },
-  { name: 'Discordbot', re: /Discordbot/i },
-  { name: 'Bytespider', re: /Bytespider/i },
-  { name: 'PetalBot', re: /PetalBot/i },
-  { name: 'SemrushBot', re: /SemrushBot/i },
-  { name: 'AhrefsBot', re: /AhrefsBot/i },
-  { name: 'DotBot', re: /DotBot/i },
-  { name: 'GPTBot', re: /GPTBot/i },
-  { name: 'ClaudeBot', re: /ClaudeBot|anthropic-ai/i },
-  { name: 'Amazonbot', re: /Amazonbot/i },
-  { name: 'Sogou', re: /Sogou/i },
-  // Generic last — still mark as bot without inventing a browser name.
-  { name: 'bot', re: /\b(?:bot|crawler|spider|slurp)\b/i },
+export interface TrafficMatch {
+  bot: boolean;
+  botName?: string;
+  botKind: TrafficKind;
+}
+
+type TrafficRule = {
+  name: string;
+  kind: Exclude<TrafficKind, 'human'>;
+  re: RegExp;
+};
+
+/** Order: automation, AI operators, AI crawlers, search crawlers, generic. */
+const TRAFFIC_RULES: TrafficRule[] = [
+  { name: 'HeadlessChrome', kind: 'automation', re: /HeadlessChrome/i },
+  { name: 'Playwright', kind: 'automation', re: /Playwright/i },
+  { name: 'Puppeteer', kind: 'automation', re: /Puppeteer/i },
+  { name: 'Selenium', kind: 'automation', re: /Selenium|WebDriver/i },
+  { name: 'PhantomJS', kind: 'automation', re: /PhantomJS/i },
+  { name: 'Cypress', kind: 'automation', re: /Cypress/i },
+  { name: 'ChatGPT-User', kind: 'ai_agent', re: /ChatGPT-User/i },
+  { name: 'OAI-SearchBot', kind: 'ai_agent', re: /OAI-SearchBot/i },
+  { name: 'Claude-User', kind: 'ai_agent', re: /Claude-User/i },
+  { name: 'Claude-SearchBot', kind: 'ai_agent', re: /Claude-SearchBot/i },
+  { name: 'ChatGPT Atlas', kind: 'ai_agent', re: /ChatGPT-Atlas|ChatGPT Atlas/i },
+  { name: 'Comet', kind: 'ai_agent', re: /Perplexity Comet|CometBrowser/i },
+  { name: 'GPTBot', kind: 'ai_crawler', re: /GPTBot/i },
+  { name: 'ClaudeBot', kind: 'ai_crawler', re: /ClaudeBot|anthropic-ai/i },
+  { name: 'PerplexityBot', kind: 'ai_crawler', re: /PerplexityBot/i },
+  { name: 'Google-Extended', kind: 'ai_crawler', re: /Google-Extended/i },
+  { name: 'Amazonbot', kind: 'ai_crawler', re: /Amazonbot/i },
+  { name: 'Bytespider', kind: 'ai_crawler', re: /Bytespider/i },
+  { name: 'meta-externalagent', kind: 'ai_crawler', re: /meta-externalagent/i },
+  { name: 'Baiduspider', kind: 'crawler', re: /Baiduspider/i },
+  { name: 'Googlebot', kind: 'crawler', re: /Googlebot/i },
+  { name: 'Bingbot', kind: 'crawler', re: /bingbot/i },
+  { name: 'DuckDuckBot', kind: 'crawler', re: /DuckDuckBot/i },
+  { name: 'YandexBot', kind: 'crawler', re: /Yandex(Bot|Images)/i },
+  { name: 'Applebot', kind: 'crawler', re: /Applebot/i },
+  { name: 'facebookexternalhit', kind: 'crawler', re: /facebookexternalhit|Facebot/i },
+  { name: 'Twitterbot', kind: 'crawler', re: /Twitterbot/i },
+  { name: 'LinkedInBot', kind: 'crawler', re: /LinkedInBot/i },
+  { name: 'Slackbot', kind: 'crawler', re: /Slackbot/i },
+  { name: 'Discordbot', kind: 'crawler', re: /Discordbot/i },
+  { name: 'PetalBot', kind: 'crawler', re: /PetalBot/i },
+  { name: 'SemrushBot', kind: 'crawler', re: /SemrushBot/i },
+  { name: 'AhrefsBot', kind: 'crawler', re: /AhrefsBot/i },
+  { name: 'DotBot', kind: 'crawler', re: /DotBot/i },
+  { name: 'Sogou', kind: 'crawler', re: /Sogou/i },
+  { name: 'bot', kind: 'crawler', re: /\b(?:bot|crawler|spider|slurp)\b/i },
 ];
 
 const WEBVIEW_RULES: Array<{
@@ -90,17 +128,33 @@ const WEBVIEW_RULES: Array<{
   { host: 'Snapchat', re: /Snapchat/i, versionRe: /Snapchat\/([\d.]+)/i },
 ];
 
-export function detectBot(ua: string): { bot: boolean; botName?: string } {
-  if (!ua) return { bot: false };
-  for (const rule of BOT_RULES) {
-    if (rule.re.test(ua)) {
-      return {
-        bot: true,
-        botName: rule.name === 'bot' ? undefined : rule.name,
-      };
+export function detectTraffic(
+  ua: string,
+  webdriver = false,
+): TrafficMatch {
+  if (ua) {
+    for (const rule of TRAFFIC_RULES) {
+      if (rule.re.test(ua)) {
+        return {
+          bot: true,
+          botKind: rule.kind,
+          ...(rule.name === 'bot' ? {} : { botName: rule.name }),
+        };
+      }
     }
   }
-  return { bot: false };
+  if (webdriver) {
+    return { bot: true, botKind: 'automation', botName: 'WebDriver' };
+  }
+  return { bot: false, botKind: 'human' };
+}
+
+/** Known crawlers — prefer specific names before the generic bot/spider fallback. */
+export function detectBot(ua: string): { bot: boolean; botName?: string } {
+  const match = detectTraffic(ua);
+  return match.bot
+    ? { bot: true, ...(match.botName ? { botName: match.botName } : {}) }
+    : { bot: false };
 }
 
 export function detectWebView(ua: string): {
@@ -133,6 +187,28 @@ export function detectEngine(ua: string): string {
   return 'unknown';
 }
 
+/** First numeric segment — Chrome 126.0.0.0 → 126. */
+export function majorVersion(version: string): string {
+  const m = version.trim().match(/^(\d+)/);
+  return m?.[1] ?? '';
+}
+
+export function readWebdriver(): boolean {
+  try {
+    return typeof navigator !== 'undefined' && navigator.webdriver === true;
+  } catch {
+    return false;
+  }
+}
+
+export function readTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Lightweight UA parse — no dependency. Good enough for triage tags;
  * full UA is still attached in extra for debugging.
@@ -140,10 +216,12 @@ export function detectEngine(ua: string): string {
 export function parseBrowserContext(
   ua = typeof navigator !== 'undefined' ? navigator.userAgent : '',
   language = typeof navigator !== 'undefined' ? navigator.language : '',
+  options?: { webdriver?: boolean },
 ): BrowserContext {
   const userAgent = ua || '';
   const lang = language || '';
-  const botInfo = detectBot(userAgent);
+  const webdriver = options?.webdriver === true;
+  const botInfo = detectTraffic(userAgent, webdriver);
   const webviewInfo = botInfo.bot
     ? { webview: false as const }
     : detectWebView(userAgent);
@@ -234,6 +312,8 @@ export function parseBrowserContext(
     language: lang,
     userAgent,
     bot: botInfo.bot,
+    botKind: botInfo.botKind,
+    webdriver,
     ...(botInfo.botName ? { botName: botInfo.botName } : {}),
     webview: webviewInfo.webview,
     ...('host' in webviewInfo && webviewInfo.host
@@ -262,6 +342,7 @@ export function browserContextTags(ctx: BrowserContext): BrowserContextTags {
       ? {
           bot: 'true',
           ...(ctx.botName ? { 'bot.name': ctx.botName } : {}),
+          'bot.kind': ctx.botKind,
         }
       : {}),
   };
@@ -269,7 +350,12 @@ export function browserContextTags(ctx: BrowserContext): BrowserContextTags {
 
 /** Prefer Client Hints when available (Chromium). */
 export async function collectBrowserContext(): Promise<BrowserContext> {
-  const base = parseBrowserContext();
+  const webdriver = readWebdriver();
+  const base = parseBrowserContext(
+    undefined,
+    undefined,
+    { webdriver },
+  );
 
   // Keep crawler classification from UA — Client Hints are for real browsers.
   if (base.bot) return base;

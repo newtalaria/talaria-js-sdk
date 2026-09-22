@@ -20,7 +20,10 @@ import {
 import {
   browserContextTags,
   collectBrowserContext,
+  majorVersion,
   parseBrowserContext,
+  readTimeZone,
+  readWebdriver,
   type BrowserContext,
 } from './utils/browser_context.js';
 import {
@@ -540,7 +543,9 @@ export class TalariaClient {
     this.linkableReplayId = null;
     this.lastReplayCaptureFailure = null;
     this.recentNetworkFailures = [];
-    this.browserContext = parseBrowserContext();
+    this.browserContext = parseBrowserContext(undefined, undefined, {
+      webdriver: readWebdriver(),
+    });
     this.breadcrumbs.clear();
     this.scope.clear();
     if (this.options.userId) this.scope.setUser({ id: this.options.userId });
@@ -750,6 +755,7 @@ export class TalariaClient {
       getEnvironment: () => this.options?.environment,
       getRelease: () => this.options?.release,
       getPageContext: () => this.pageContext(),
+      getRuntimeContext: () => this.analyticsRuntimeContext(),
       mapScreenToPage: true,
       logLabel: '@newtalaria/browser',
       onPermanentError: (error) => {
@@ -781,6 +787,43 @@ export class TalariaClient {
       path: loc?.pathname,
       title,
       referrer,
+    };
+  }
+
+  private analyticsRuntimeContext(): {
+    browserName?: string;
+    browserVersion?: string;
+    browserEngine?: string;
+    osName?: string;
+    osVersion?: string;
+    device?: string;
+    locale?: string;
+    timezone?: string;
+    webview?: boolean;
+    webviewHost?: string;
+    bot?: boolean;
+    botName?: string;
+    botKind?: string;
+    webdriver?: boolean;
+  } | undefined {
+    const ctx = this.browserContext;
+    if (!ctx) return undefined;
+    const timezone = readTimeZone();
+    return {
+      browserName: ctx.name === 'unknown' ? undefined : ctx.name,
+      browserVersion: majorVersion(ctx.version) || undefined,
+      browserEngine: ctx.engine === 'unknown' ? undefined : ctx.engine,
+      osName: ctx.os === 'unknown' ? undefined : ctx.os,
+      osVersion: majorVersion(ctx.osVersion) || undefined,
+      device: ctx.device === 'unknown' ? undefined : ctx.device,
+      locale: ctx.language || undefined,
+      timezone: timezone || undefined,
+      webview: ctx.webview || undefined,
+      webviewHost: ctx.webviewHost,
+      bot: ctx.bot || undefined,
+      botName: ctx.botName,
+      botKind: ctx.botKind,
+      webdriver: ctx.webdriver || undefined,
     };
   }
 
@@ -1393,6 +1436,7 @@ export class TalariaClient {
                 language: this.browserContext.language,
                 userAgent: this.browserContext.userAgent,
                 bot: this.browserContext.bot,
+                botKind: this.browserContext.botKind,
                 ...(this.browserContext.botName
                   ? { botName: this.browserContext.botName }
                   : {}),

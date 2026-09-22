@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import {
   browserContextTags,
   detectBot,
+  detectTraffic,
+  majorVersion,
   parseBrowserContext,
 } from '../src/utils/browser_context.js';
 
@@ -19,6 +21,7 @@ describe('parseBrowserContext', () => {
     assert.equal(ctx.device, 'desktop');
     assert.equal(ctx.language, 'en-NZ');
     assert.equal(ctx.bot, false);
+    assert.equal(ctx.botKind, 'human');
     assert.equal(ctx.engine, 'Blink');
     assert.equal(ctx.webview, false);
   });
@@ -97,6 +100,7 @@ describe('parseBrowserContext', () => {
     const ctx = parseBrowserContext(ua, 'zh-CN');
     assert.equal(ctx.bot, true);
     assert.equal(ctx.botName, 'Baiduspider');
+    assert.equal(ctx.botKind, 'crawler');
     assert.equal(ctx.name, 'unknown');
     assert.equal(ctx.device, 'desktop');
     const tags = browserContextTags(ctx);
@@ -132,5 +136,46 @@ describe('detectBot', () => {
       ),
       { bot: false },
     );
+  });
+});
+
+describe('detectTraffic', () => {
+  it('classifies GPTBot as an AI crawler', () => {
+    assert.deepEqual(
+      detectTraffic(
+        'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.2; +https://openai.com/gptbot)',
+      ),
+      { bot: true, botKind: 'ai_crawler', botName: 'GPTBot' },
+    );
+  });
+
+  it('classifies ChatGPT-User as an AI agent', () => {
+    const match = detectTraffic(
+      'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot',
+    );
+    assert.equal(match.botKind, 'ai_agent');
+    assert.equal(match.botName, 'ChatGPT-User');
+  });
+
+  it('classifies HeadlessChrome as automation', () => {
+    const match = detectTraffic(
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/126.0.0.0 Safari/537.36',
+    );
+    assert.equal(match.botKind, 'automation');
+    assert.equal(match.botName, 'HeadlessChrome');
+  });
+
+  it('treats navigator.webdriver as automation', () => {
+    const match = detectTraffic(
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36',
+      true,
+    );
+    assert.equal(match.botKind, 'automation');
+    assert.equal(match.botName, 'WebDriver');
+  });
+
+  it('keeps major browser version', () => {
+    assert.equal(majorVersion('126.0.0.0'), '126');
+    assert.equal(majorVersion('17.5'), '17');
   });
 });
