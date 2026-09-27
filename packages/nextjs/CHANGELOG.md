@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Package docs point at the marketing guides.
+
 ## 0.4.0
 
 - Project policy from `POST /sdk/getConfig` controls tracing, replay, analytics, heatmaps, and the event sample rate.
