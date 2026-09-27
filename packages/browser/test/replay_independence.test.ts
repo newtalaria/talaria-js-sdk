@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { TalariaClient } from '../src/client.ts';
+import { policyDocument } from './policy_fixture.ts';
 import { DEFAULT_IGNORE_ERRORS, shouldDropCapturedError } from '../src/utils/event_filters.js';
 
 describe('replay independence', () => {
@@ -21,10 +22,21 @@ describe('replay independence', () => {
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         environment: 'development',
-        replaysSessionSampleRate: 1,
-        replaysOnErrorSampleRate: 1,
+        remoteConfig: false,
         disableDefaultIntegrations: true,
       });
+      client.applySdkConfig(
+        policyDocument({
+          replay: {
+            enabled: true,
+            sessionSampleRate: 1,
+            errorSampleRate: 1,
+            maxDurationMs: 300000,
+            maskAllInputs: true,
+            blockSelectors: [],
+          },
+        }),
+      );
 
       await client.captureException(
         new Error("Can't find variable: _AutofillCallbackHandler"),

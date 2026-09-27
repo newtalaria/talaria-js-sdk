@@ -68,6 +68,10 @@ export class Tracer {
     this.ended.length = 0;
   }
 
+  setSampleRate(sampleRate: number): void {
+    this.options.sampleRate = sampleRate;
+  }
+
   isSampled(): boolean {
     return shouldKeepTransaction(this.sampled, this.hasError);
   }

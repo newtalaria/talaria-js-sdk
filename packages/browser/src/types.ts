@@ -30,7 +30,7 @@ export type FailedRequestStatusCode = number | [number, number];
 
 export interface TalariaInitOptions {
   /**
-   * Talaria API base URL, e.g. `https://api.newtalaria.com`.
+   * Talaria API base URL, e.g. `https://ingest.newtalaria.com`.
    * Alias of `baseUrl`.
    */
   dsn?: string;
@@ -62,13 +62,8 @@ export interface TalariaInitOptions {
    */
   loggers?: Record<string, LoggerPreset>;
   /**
-   * Fraction of eligible events to send (0–1). Default `1`.
-   * Applied after `minLevel`, before `beforeSend`. Independent of replay sample rates.
-   */
-  sampleRate?: number;
-  /**
    * Return `null` to drop; otherwise return the (possibly mutated) event.
-   * Runs after `minLevel` and `sampleRate` gates.
+   * Runs after `minLevel`. Event sampling follows the project policy document.
    */
   beforeSend?: (
     event: BeforeSendEvent,
@@ -83,20 +78,23 @@ export interface TalariaInitOptions {
    * Drop events when a stack frame URL matches. Secondary to `ignoreErrors`.
    */
   ignoreUrls?: Array<string | RegExp>;
-  /** Fraction of sessions that upload continuously (0–1). Default `0`. */
-  replaysSessionSampleRate?: number;
-  /**
-   * Fraction of errors that promote the ring buffer to an uploaded replay (0–1).
-   * Default `1`. Ignored once `replaysSessionSampleRate` already enabled upload.
-   */
-  replaysOnErrorSampleRate?: number;
   /**
    * How long to keep uploading after an error-sample hit (ms).
    * - Default `15000` (~15s): cheap error clip, then finish and return to buffer mode.
    * - `0`: Sentry-like — continue until the 5-minute max duration or page unload.
    */
   replaysErrorAfterMs?: number;
-  /** Passed to rrweb. Default `true`. */
+  /**
+   * Skip the policy fetch and cache. The SDK sends errors only.
+   * Default `false`.
+   */
+  remoteConfig?: boolean;
+  /**
+   * Public pages opt into analytics when the project policy allows it.
+   * CMS and other private surfaces leave this unset.
+   */
+  publicAnalytics?: boolean;
+  /** Passed to rrweb until a policy document replaces it. Default `true`. */
   maskAllInputs?: boolean;
   /**
    * Embed accessible stylesheet rules into the snapshot (rrweb `inlineStylesheet`).
@@ -169,25 +167,6 @@ export interface TalariaInitOptions {
    * Example: `['https://cdn.example.com']` for CDN-hosted app bundles.
    */
   inAppOrigins?: string[];
-  /**
-   * Enable pageload + fetch/XHR tracing (`spans/ingestBatch`).
-   * Off until this is `true` **or** `tracesSampleRate > 0`.
-   * Explicit `false` disables tracing even if a sample rate is set.
-   */
-  enableTracing?: boolean;
-  /**
-   * Head-based sample rate for successful transactions (0–1).
-   * Error transactions are always kept. Default `0.1` when tracing is on.
-   */
-  tracesSampleRate?: number;
-  /**
-   * Product analytics (`POST {baseUrl}/analytics/ingestBatch`).
-   * Default `false` until `Talaria.analytics.optIn()` or this is `true`.
-   * Alias: `analyticsEnabled`.
-   */
-  enableAnalytics?: boolean;
-  /** Alias of {@link enableAnalytics}. */
-  analyticsEnabled?: boolean;
 }
 
 export interface ResolvedOptions {
@@ -228,4 +207,7 @@ export interface ResolvedOptions {
   tracingEnabled: boolean;
   tracesSampleRate: number;
   enableAnalytics: boolean;
+  heatmaps: boolean;
+  remoteConfig: boolean;
+  publicAnalytics: boolean;
 }

@@ -1,18 +1,27 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { TalariaClient } from '../src/client.ts';
+import { policyDocument } from './policy_fixture.ts';
 import type { BeforeSendEvent } from '../src/types.ts';
 
 type IngestBody = {
   input?: Record<string, unknown>;
 };
 
-function eventOf(body: IngestBody): Record<string, unknown> {
+function eventsIn(body: IngestBody): Array<Record<string, unknown>> {
   const input = body.input ?? {};
   if (input.__className__ === 'IngestEventBatchInput') {
-    return ((input.events as Array<Record<string, unknown>>) ?? [])[0] ?? {};
+    return (input.events as Array<Record<string, unknown>>) ?? [];
   }
-  return input;
+  return Object.keys(input).length ? [input] : [];
+}
+
+function sentEvents(bodies: IngestBody[]): Array<Record<string, unknown>> {
+  return bodies.flatMap(eventsIn);
+}
+
+function eventOf(body: IngestBody): Record<string, unknown> {
+  return eventsIn(body)[0] ?? {};
 }
 
 function installFetchCapture(): {
@@ -65,7 +74,7 @@ describe('logger API', () => {
       await client.error('hello-error');
       await client.close();
 
-      const levels = bodies.map((b) => eventOf(b).level);
+      const levels = sentEvents(bodies).map((event) => event.level);
       assert.deepEqual(levels, ['info', 'warning', 'error']);
     } finally {
       restore();
@@ -82,7 +91,7 @@ describe('logger API', () => {
       await client.error('e');
       await client.close();
 
-      const messages = bodies.map((b) => eventOf(b).message);
+      const messages = sentEvents(bodies).map((event) => event.message);
       assert.deepEqual(messages, ['w', 'e']);
     } finally {
       restore();
@@ -92,9 +101,11 @@ describe('logger API', () => {
   it('sampleRate 0 drops all events after minLevel', async () => {
     const { bodies, restore } = installFetchCapture();
     try {
-      const client = initClient({ sampleRate: 0 });
+      const client = initClient({ remoteConfig: false });
+      client.applySdkConfig(policyDocument({ events: { sampleRate: 0 } }));
       await client.fatal('should-not-send');
       await client.captureException(new Error('nope'));
+      await client.flush();
       await client.close();
       assert.equal(bodies.length, 0);
     } finally {
@@ -169,10 +180,11 @@ describe('logger API', () => {
       await weakened.info('info-from-weakened');
       await client.close();
 
-      const messages = bodies.map((b) => eventOf(b).message);
+      const events = sentEvents(bodies);
+      const messages = events.map((event) => event.message);
       assert.deepEqual(messages, ['warn-ok', 'err-ok', 'info-from-weakened']);
 
-      const errTags = eventOf(bodies[1]!).tags as Record<string, string>;
+      const errTags = events[1]!.tags as Record<string, string>;
       assert.equal(errTags.feature, 'blog');
       assert.equal(errTags.component, 'x');
     } finally {
@@ -198,7 +210,7 @@ describe('logger API', () => {
       await client.info('direct-dropped');
       await client.close();
 
-      const messages = bodies.map((b) => eventOf(b).message);
+      const messages = sentEvents(bodies).map((event) => event.message);
       assert.deepEqual(messages, ['bd-info']);
       const tags = eventOf(bodies[0]!).tags as Record<string, string>;
       assert.equal(tags.area, 'businessDirectory');
@@ -287,6 +299,7 @@ describe('logger API', () => {
     try {
       const client = initClient({ minLevel: 'fatal' });
       await client.captureException(new Error('dropped-as-error'));
+      await client.flush();
       await client.fatal('kept-fatal');
       await client.close();
       assert.equal(bodies.length, 1);

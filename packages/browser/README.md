@@ -18,7 +18,7 @@ Load the IIFE build from a CDN or your own static host, then call `Talaria.init`
 <script src="https://cdn.jsdelivr.net/npm/@newtalaria/browser/dist/talaria.browser.iife.js"></script>
 <script>
   Talaria.init({
-    dsn: 'https://api.newtalaria.com',
+    dsn: 'https://ingest.newtalaria.com',
     apiKey: 'tal_live_…',
     environment: 'production',
     minLevel: 'warning',
@@ -30,13 +30,13 @@ Pin a version in production (for example `@newtalaria/browser@0.1.25`) instead o
 
 ## Initialize (best practices)
 
-Create a client key under **Project settings → Client keys** (`tal_live_…`). Use your project’s API base URL as `dsn` (Talaria Cloud: `https://api.newtalaria.com`).
+Create a client key under **Project settings → Client keys** (`tal_live_…`). Use your project’s API base URL as `dsn` (Talaria Cloud: `https://ingest.newtalaria.com`).
 
 ```ts
 import { Talaria } from '@newtalaria/browser';
 
 Talaria.init({
-  dsn: 'https://api.newtalaria.com',
+  dsn: 'https://ingest.newtalaria.com',
   apiKey: 'tal_live_…',
   environment: 'production', // staging | development also accepted
   release: '1.4.2',          // deploy version — first-class field, not a tag
@@ -187,7 +187,7 @@ await analytics.captureException(err);
 
 ```ts
 Talaria.init({
-  dsn: 'https://api.newtalaria.com',
+  dsn: 'https://ingest.newtalaria.com',
   apiKey: 'tal_live_…',
   environment: 'production',
   minLevel: 'warning',
@@ -257,6 +257,20 @@ Failed captures do **not** set `replayId` (avoids linking an empty player).
 - Block sensitive nodes with `data-talaria-mask` or `blockSelector`.
 - For **login-protected admin CSS**, set `inlineStylesheet: true` so same-origin styles are embedded while the user is logged in. Public sites usually leave this `false`.
 
+## Heatmaps
+
+With analytics consent on (`enableAnalytics: true` or `Talaria.analytics.optIn()`), each pageview records element clicks and scroll depth and sends them to `POST /heatmaps/ingestBatch` (same `analyticsWrite` scope). Set `heatmaps: false` to keep analytics without heatmaps; the project can also turn them off in settings.
+
+- Clicks are placed by **element**: a stable CSS selector plus the offset inside the element, so maps stay accurate across widths. Clicks inside a button or link count toward the control; clicks inside a blocked node count toward the blocked node.
+- **Rage**: 3+ clicks within 1s and 30px. **Dead**: no DOM change, URL change, scroll, or focus change within 1s (form fields and text selection excluded). **Error**: an error captured by the SDK within 2s.
+- Scroll depth is `scrollY + innerHeight` on document scrolling, against the tallest document height seen.
+- Element text and input values are never sent. Selectors prefer `data-talaria-heatmap`, then `data-testid`, then a stable `id`, and skip generated / state classes and anything with an email or long number.
+- When the server asks for a page backdrop, the SDK sends one masked DOM snapshot (`maskAllInputs`, `blockSelector`, `data-talaria-mask`; readable stylesheets inlined). `rrweb-snapshot` loads only at that point.
+
+```html
+<button data-talaria-heatmap="checkout-cta">Checkout</button>
+```
+
 ## Failed HTTP / network requests
 
 All instrumented `fetch` / XHR calls are recorded as replay breadcrumbs except Talaria ingest/replay/span traffic. **Error events are promoted only for first-party (same-origin) or allowlisted origins** — so analytics, ads, and widgets do not spam Issues.
@@ -269,7 +283,7 @@ All instrumented `fetch` / XHR calls are recorded as replay breadcrumbs except T
 
 ```ts
 Talaria.init({
-  dsn: 'https://api.newtalaria.com',
+  dsn: 'https://ingest.newtalaria.com',
   apiKey: 'tal_live_…',
   environment: 'production',
   minLevel: 'warning',
@@ -286,18 +300,16 @@ Query strings are stripped from network telemetry by default. Bodies and auth he
 
 ## Tracing (performance)
 
-Turn tracing on in the project (`tracingEnabled`), then set `enableTracing: true` or `tracesSampleRate > 0`. Spans are a parallel ingest path (`POST /spans/ingestBatch`) — they are never mixed into `events/ingest`. Browser keys need the `spansWrite` scope; auth is the same `X-API-Key` header. Sampled root transactions are included on the plan — there is no Performance add-on.
+Tracing, replay, analytics, and heatmaps follow the project policy from `POST /sdk/getConfig`. The SDK caches that document and refreshes it after `ttlSeconds`. Spans are a parallel ingest path (`POST /spans/ingestBatch`) — they are never mixed into `events/ingest`. Browser keys need the `spansWrite` scope; auth is the same `X-API-Key` header. Sampled root transactions are included on the plan — there is no Performance add-on. Visitor analytics still requires `Talaria.analytics.optIn()`.
 
-Sampling is **head-based**: successful pageload transactions use `tracesSampleRate` (default **10%** once tracing is on). Transactions that contain an error are always kept.
+Sampling is **head-based**: successful pageload transactions use the project's `tracesSampleRate`. Transactions that contain an error are always kept.
 
 ```ts
 Talaria.init({
-  dsn: 'https://api.newtalaria.com',
+  dsn: 'https://ingest.newtalaria.com',
   apiKey: 'tal_live_…',
   environment: 'production',
   minLevel: 'warning',
-  enableTracing: true,       // or tracesSampleRate: 0.1
-  tracesSampleRate: 0.1,     // successful pageloads; errors are 100%
   networkErrorOrigins: ['https://api.stripe.com'],
 });
 ```
@@ -317,7 +329,7 @@ Error events also receive `traceId` / `spanId` (when a trace is active) and the 
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `dsn` / `baseUrl` | *(required)* | Talaria API base URL, e.g. `https://api.newtalaria.com` |
+| `dsn` / `baseUrl` | *(required)* | Talaria API base URL, e.g. `https://ingest.newtalaria.com` |
 | `apiKey` | *(required)* | Public client key (`tal_live_…`). Safe to embed; configure allowed domains in the dashboard for production. |
 | `environment` | *(required)* | `production` \| `staging` \| `development` (aliases accepted) |
 | `release` | — | Optional release string on every event |
@@ -327,10 +339,9 @@ Error events also receive `traceId` / `spanId` (when a trace is active) and the 
 | `minLevel` | `'debug'` | Default/root severity; use `'warning'` in production |
 | `enforceDefaultLevel` | `false` | When true, scoped loggers cannot go below `minLevel` |
 | `loggers` | `{}` | Named presets for `Talaria.logger('name')` |
-| `sampleRate` | `1` | Fraction of eligible events to send (after level gate) |
 | `beforeSend` | — | `(event, hint) => event \| null` — mutate or drop after gates |
-| `replaysSessionSampleRate` | `0` | Fraction of sessions that upload continuously |
-| `replaysOnErrorSampleRate` | `1` | Fraction of errors that promote the ring buffer |
+| `remoteConfig` | `true` | Fetch and cache project policy. `false` sends errors only |
+| `publicAnalytics` | `false` | Call `analytics.optIn()` when the project policy allows analytics |
 | `replaysErrorAfterMs` | `15000` | Post-error upload window; `0` = continue until session cap |
 | `maskAllInputs` | `true` | Mask inputs in replay |
 | `inlineStylesheet` | `false` | Embed same-origin CSS (auth-gated admin UIs) |
@@ -344,8 +355,7 @@ Error events also receive `traceId` / `spanId` (when a trace is active) and the 
 | `captureRequestQueryParameters` | `false` | Keep `?query` on network URLs after redaction |
 | `inAppOrigins` | `[]` | Extra origins treated as app code for stack `inApp` |
 | `inAppAllowUrls` / `inAppDenyUrls` | `[]` | Force stack frames `inApp: true` / `false` |
-| `enableTracing` | `false` | Turn on pageload + fetch/XHR spans. Also implied when `tracesSampleRate > 0` |
-| `tracesSampleRate` | `0.1` when tracing is on, else `0` | Head sample rate for successful transactions (errors always kept) |
+| `analytics.optIn()` / `optOut()` | — | Visitor consent. Analytics and heatmaps also require the project policy |
 
 ## Public API
 

@@ -156,13 +156,9 @@ export interface CoreInitOptions {
    */
   anonymousId?: string;
   tags?: Record<string, string>;
-  enableTracing?: boolean;
-  tracesSampleRate?: number;
   /**
-   * Product analytics (`analytics/ingestBatch`). Default `false` until
-   * `Talaria.analytics.optIn()` or this is `true`. Alias: `analyticsEnabled`.
+   * Skip the policy fetch and cache. The SDK sends errors only.
+   * Default `false`.
    */
-  enableAnalytics?: boolean;
-  /** Alias of {@link enableAnalytics}. */
-  analyticsEnabled?: boolean;
+  remoteConfig?: boolean;
 }

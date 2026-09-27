@@ -13,10 +13,10 @@ import http from 'node:http';
 import { Talaria, handleHttpRequest } from '@newtalaria/node';
 
 Talaria.init({
-  dsn: 'https://api.newtalaria.com',
+  dsn: 'https://ingest.newtalaria.com',
   apiKey: process.env.TALARIA_API_KEY!,
   environment: process.env.TALARIA_ENVIRONMENT ?? 'production',
-  enableTracing: true,
+  remoteConfig: true,
 });
 
 http.createServer((req, res) => {

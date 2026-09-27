@@ -16,7 +16,7 @@ const client = new TalariaClient();
  * import { Talaria } from '@newtalaria/browser';
  *
  * Talaria.init({
- *   dsn: 'https://api.newtalaria.com',
+ *   dsn: 'https://ingest.newtalaria.com',
  *   apiKey: 'tal_live_…',
  *   environment: 'production',
  *   minLevel: 'warning',

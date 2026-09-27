@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { TalariaClient } from '../src/client.ts';
+import { policyDocument } from './policy_fixture.ts';
 
 type Call = { url: string; body: Record<string, unknown>; headers: Headers };
 
@@ -70,6 +71,7 @@ describe('browser tracing', () => {
         disableDefaultIntegrations: true,
       });
       await client.captureException(new Error('boom'));
+      await client.flush();
       await client.close();
       assert.equal(
         calls.some((c) => c.url.includes('/spans/')),
@@ -97,14 +99,12 @@ describe('browser tracing', () => {
           dsn: 'http://localhost:8080',
           apiKey: 'tal_live_test',
           environment: 'development',
-          replaysSessionSampleRate: 0,
-          replaysOnErrorSampleRate: 0,
+          remoteConfig: false,
           disableDefaultIntegrations: true,
-          enableTracing: true,
-          tracesSampleRate: 1,
           networkErrorOrigins: ['https://api.stripe.com'],
           tags: { service: 'storefront' },
         });
+        client.applySdkConfig(policyDocument());
 
         await fetch('https://app.example.com/api/cart');
         await fetch('https://api.stripe.com/v1/tokens');
@@ -120,6 +120,7 @@ describe('browser tracing', () => {
         assert.equal(gaCall?.headers.get('traceparent'), null);
 
         await client.captureException(new Error('checkout failed'));
+      await client.flush();
         await client.close();
 
         const event = calls.find((c) => c.url.includes('/events/ingest'));

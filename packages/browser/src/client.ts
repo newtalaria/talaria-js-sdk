@@ -41,13 +41,22 @@ import {
 import { SDK_NAME, SDK_VERSION } from './sdk_meta.js';
 import { ServerpodTransport } from './transport/serverpod.js';
 import { IngestError } from './transport/ingest_error.js';
-import { ingestEventBatch } from './transport/events.js';
 import {
   AnalyticsFacade,
   createWebStorage,
+  disabledSignal,
+  documentIsFresh,
+  EventIngestQueue,
+  fetchSdkConfig,
   IdentityStore,
   normalizeBreadcrumb,
+  readPolicyCache,
   Scope,
+  tombstoneFromError,
+  tombstoneIsQuiet,
+  writePolicyCache,
+  type SdkConfigDocument,
+  type SdkPolicyStorage,
   type Span,
   type UserContext,
 } from '@newtalaria/core';
@@ -104,6 +113,7 @@ import {
   isTimeoutError,
 } from './utils/network_error.js';
 import { installWebVitals } from './integrations/web_vitals.js';
+import { HeatmapRecorder } from './heatmaps/heatmap_recorder.js';
 import {
   BreadcrumbBuffer,
   consoleBreadcrumb,
@@ -116,10 +126,6 @@ import {
   isTalariaIngestUrl,
   shouldInjectTraceparent,
 } from './tracing/instrument_http.js';
-import {
-  isTracingEnabled,
-  resolveTracesSampleRate,
-} from './tracing/sampling.js';
 import { formatTraceparent } from './tracing/traceparent.js';
 import { Tracer } from './tracing/tracer.js';
 
@@ -350,12 +356,14 @@ function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
       normalizeSeverity(String(options.minLevel ?? 'debug')) ?? 'debug',
     enforceDefaultLevel: Boolean(options.enforceDefaultLevel),
     loggers: normalizeLoggerPresets(options.loggers),
-    sampleRate: clamp01(options.sampleRate ?? 1),
+    sampleRate: 1,
+    remoteConfig: options.remoteConfig !== false,
+    publicAnalytics: options.publicAnalytics === true,
     beforeSend: options.beforeSend,
     ignoreErrors: [...DEFAULT_IGNORE_ERRORS, ...(options.ignoreErrors ?? [])],
     ignoreUrls: options.ignoreUrls ?? [],
-    replaysSessionSampleRate: clamp01(options.replaysSessionSampleRate ?? 0),
-    replaysOnErrorSampleRate: clamp01(options.replaysOnErrorSampleRate ?? 1),
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 0,
     replaysErrorAfterMs: normalizeErrorAfterMs(options.replaysErrorAfterMs),
     maskAllInputs: options.maskAllInputs ?? true,
     inlineStylesheet: options.inlineStylesheet ?? false,
@@ -375,11 +383,10 @@ function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
     inAppAllowUrls: options.inAppAllowUrls ?? [],
     inAppDenyUrls: options.inAppDenyUrls ?? [],
     inAppOrigins: options.inAppOrigins ?? [],
-    tracingEnabled: isTracingEnabled(options),
-    tracesSampleRate: resolveTracesSampleRate(options),
-    enableAnalytics: Boolean(
-      options.enableAnalytics ?? options.analyticsEnabled,
-    ),
+    tracingEnabled: false,
+    tracesSampleRate: 0,
+    enableAnalytics: false,
+    heatmaps: false,
   };
 }
 
@@ -388,6 +395,33 @@ const RECENT_NETWORK_FAILURE_MS = 5_000;
 interface RecentNetworkFailure extends NetworkMeta {
   at: number;
   promoted: boolean;
+}
+
+function browserPolicyStorage(): SdkPolicyStorage | null {
+  if (typeof localStorage === 'undefined') return null;
+  return {
+    get: (key) => {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    },
+    set: (key, value) => {
+      try {
+        localStorage.setItem(key, value);
+      } catch {
+        /* quota or private mode */
+      }
+    },
+    remove: (key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
+    },
+  };
 }
 
 function clamp01(n: number): number {
@@ -510,6 +544,8 @@ export class TalariaClient {
   private lastAnalyticsPath: string | null = null;
   private identity: IdentityStore | null = null;
   private analyticsFacade: AnalyticsFacade | null = null;
+  private heatmaps: HeatmapRecorder | null = null;
+  private eventQueue: EventIngestQueue | null = null;
 
   init(options: TalariaInitOptions): void {
     if (this.options) {
@@ -521,6 +557,12 @@ export class TalariaClient {
     this.transport = new ServerpodTransport({
       baseUrl: this.options.baseUrl,
       apiKey: this.options.apiKey,
+    });
+    this.eventQueue = EventIngestQueue.forTransport(this.transport, (error) => {
+      console.warn('@newtalaria/browser: event ingest failed', error);
+      if (isPermanentIngestError(error)) {
+        this.disableIngestAfterPermanentError(error, 'events');
+      }
     });
     this.identity = new IdentityStore(createWebStorage());
     const loc = currentLocation();
@@ -559,21 +601,9 @@ export class TalariaClient {
     this.buffer = new SegmentBuffer();
     this.uploadChain = Promise.resolve();
 
-    this.sessionSampled =
-      Math.random() < this.options.replaysSessionSampleRate;
-    this.uploadEnabled = this.sessionSampled;
-
-    this.recorder = startRecorder({
-      maskAllInputs: this.options.maskAllInputs,
-      inlineStylesheet: this.options.inlineStylesheet,
-      blockSelector: this.options.blockSelector,
-      // Buffer/error path: keep a FullSnapshot inside the ~60s ring. Session
-      // sample uploads continuously so periodic checkouts are skipped (size).
-      checkoutEveryNms: this.sessionSampled
-        ? undefined
-        : RING_BUFFER_CHECKOUT_MS,
-      onEvent: (event) => this.onRrwebEvent(event),
-    });
+    this.sessionSampled = false;
+    this.uploadEnabled = false;
+    this.recorder = null;
 
     this.teardowns.push(
       installConsoleHook({
@@ -590,9 +620,10 @@ export class TalariaClient {
         failedRequestStatusCodes: this.options.failedRequestStatusCodes,
         failedRequestIgnoreUrls: this.options.failedRequestIgnoreUrls,
         talariaBaseUrl: this.options.baseUrl,
-        prepareRequest: this.options.tracingEnabled
-          ? ({ rawUrl }) => this.prepareTracedRequest(rawUrl)
-          : undefined,
+        prepareRequest: ({ rawUrl }) =>
+          this.options?.tracingEnabled
+            ? this.prepareTracedRequest(rawUrl)
+            : undefined,
         onNetwork: (meta) => {
           if (
             isTalariaIngestUrl(meta.url || '', {
@@ -674,12 +705,7 @@ export class TalariaClient {
       installVisibilityResumeHook(() => this.onForegroundResume()),
     );
 
-    this.startTracer();
     this.installHistoryInstrumentation();
-
-    if (this.options.enableAnalytics) {
-      this.analyticsFacade?.optIn();
-    }
 
     if (!this.options.disableDefaultIntegrations) {
       this.installGlobalHandlers();
@@ -708,6 +734,141 @@ export class TalariaClient {
         await this.ensureStarted({ keepalive: false });
       });
     }
+
+    this.bootstrapPolicy();
+  }
+
+  /**
+   * Apply a project policy document. Production calls this from the cache and
+   * from `sdk/getConfig`. Tests call it with the canonical fixture.
+   */
+  applySdkConfig(document: SdkConfigDocument): void {
+    if (!this.options || document.schemaVersion !== 1) return;
+    if (document.unchanged) return;
+    if (document.active === false) {
+      this.stopForInactivePolicy();
+      return;
+    }
+    const eventsRate = document.events?.sampleRate;
+    this.options.sampleRate =
+      eventsRate === null || eventsRate === undefined ? 1 : clamp01(eventsRate);
+    const tracingOn = Boolean(document.tracing?.enabled);
+    this.options.tracingEnabled = tracingOn;
+    this.options.tracesSampleRate = tracingOn
+      ? clamp01(document.tracing?.tracesSampleRate ?? 0)
+      : 0;
+    this.options.enableAnalytics = Boolean(document.analytics?.enabled);
+    this.options.heatmaps = Boolean(document.heatmaps?.enabled);
+    const replay = document.replay;
+    this.options.replaysSessionSampleRate = clamp01(replay?.sessionSampleRate ?? 0);
+    this.options.replaysOnErrorSampleRate = clamp01(replay?.errorSampleRate ?? 0);
+    if (replay?.maskAllInputs !== undefined) {
+      this.options.maskAllInputs = replay.maskAllInputs;
+    }
+    if (replay?.blockSelectors && replay.blockSelectors.length > 0) {
+      const extra = replay.blockSelectors.join(',');
+      if (!this.options.blockSelector.includes(extra)) {
+        this.options.blockSelector = [this.options.blockSelector, extra]
+          .filter(Boolean)
+          .join(',');
+      }
+    }
+    if (!tracingOn) {
+      this.tracer?.disable();
+      this.tracer = null;
+    } else if (!this.tracer) {
+      this.startTracer();
+    } else {
+      this.tracer.setSampleRate(this.options.tracesSampleRate);
+    }
+    if (replay?.enabled && !this.recorder) {
+      this.sessionSampled = Math.random() < this.options.replaysSessionSampleRate;
+      this.uploadEnabled = this.sessionSampled;
+      this.recorder = startRecorder({
+        maskAllInputs: this.options.maskAllInputs,
+        inlineStylesheet: this.options.inlineStylesheet,
+        blockSelector: this.options.blockSelector,
+        checkoutEveryNms: this.sessionSampled ? undefined : RING_BUFFER_CHECKOUT_MS,
+        onEvent: (event) => this.onRrwebEvent(event),
+      });
+      if (this.uploadEnabled) {
+        this.markUploadStarted();
+        void this.enqueueUpload(async () => {
+          await this.ensureStarted({ keepalive: false });
+        });
+      }
+    } else if (replay && !replay.enabled) {
+      this.uploadEnabled = false;
+      this.replayDisabled = true;
+    }
+    if (!this.options.enableAnalytics) {
+      this.analyticsFacade?.disable();
+      this.heatmaps?.disable();
+    } else if (this.options.publicAnalytics) {
+      this.analyticsFacade?.optIn();
+    }
+  }
+
+  private stopForInactivePolicy(): void {
+    if (!this.options) return;
+    this.options.tracingEnabled = false;
+    this.options.tracesSampleRate = 0;
+    this.options.enableAnalytics = false;
+    this.options.heatmaps = false;
+    this.options.replaysSessionSampleRate = 0;
+    this.ingestDisabled = true;
+    this.eventQueue?.disable();
+    this.replayDisabled = true;
+    this.uploadEnabled = false;
+    this.tracer?.disable();
+    this.analyticsFacade?.disable();
+    this.heatmaps?.disable();
+  }
+
+  private bootstrapPolicy(): void {
+    if (!this.options || !this.options.remoteConfig || !this.transport) return;
+    const storage = browserPolicyStorage();
+    const now = Date.now();
+    const cached = readPolicyCache(storage, this.options.apiKey);
+    if (cached && tombstoneIsQuiet(cached, now)) {
+      this.stopForInactivePolicy();
+      return;
+    }
+    if (cached?.kind === 'document' && cached.document) {
+      this.applySdkConfig(cached.document);
+      if (documentIsFresh(cached, now)) return;
+    }
+    const revision =
+      cached?.kind === 'document' ? cached.document?.revision : undefined;
+    void fetchSdkConfig(this.transport, {
+      sdkName: SDK_NAME,
+      sdkVersion: SDK_VERSION,
+      platform: 'browser',
+      revision,
+    })
+      .then((document) => {
+        if (!this.options) return;
+        if (document.unchanged && cached?.document) {
+          writePolicyCache(storage, this.options.apiKey, {
+            kind: 'document',
+            fetchedAt: Date.now(),
+            document: { ...cached.document, revision: document.revision },
+          });
+          return;
+        }
+        this.applySdkConfig(document);
+        writePolicyCache(storage, this.options.apiKey, {
+          kind: 'document',
+          fetchedAt: Date.now(),
+          document,
+        });
+      })
+      .catch((error: unknown) => {
+        const tombstone = tombstoneFromError(error, Date.now());
+        if (!tombstone || !this.options) return;
+        writePolicyCache(storage, this.options.apiKey, tombstone);
+        this.stopForInactivePolicy();
+      });
   }
 
   getReplayId(): string | null {
@@ -840,7 +1001,53 @@ export class TalariaClient {
     if (!this.analyticsFacade?.isEnabled()) return;
     if (this.lastAnalyticsPath === path) return;
     this.lastAnalyticsPath = path;
-    this.analyticsFacade.page();
+    const pageViewId = this.analyticsFacade.page();
+    if (pageViewId) this.ensureHeatmaps()?.startPageView(pageViewId);
+  }
+
+  /** Created on the first consented pageview so no listeners run before opt-in. */
+  private ensureHeatmaps(): HeatmapRecorder | null {
+    if (this.heatmaps) return this.heatmaps;
+    if (!this.options?.heatmaps || typeof window === 'undefined') return null;
+    this.heatmaps = new HeatmapRecorder({
+      getTransport: () => this.transport,
+      isEnabled: () => Boolean(this.analyticsFacade?.isEnabled()),
+      getPageViewBase: () => this.heatmapPageViewBase(),
+      getReplayId: () => this.getReplayId(),
+      maskAllInputs: this.options.maskAllInputs,
+      blockSelector: this.options.blockSelector,
+      onGlobalFailure: (error) => {
+        this.disableIngestAfterPermanentError(error, 'analytics');
+      },
+    });
+    return this.heatmaps;
+  }
+
+  private heatmapPageViewBase() {
+    const ctx = this.pageContext();
+    const anonymousId = this.identity?.getAnonymousId();
+    const sessionId = this.identity?.touchSession({
+      url: ctx.url,
+      referrer: ctx.referrer,
+    });
+    if (!anonymousId || !sessionId || !ctx.url) return null;
+    const runtime = this.analyticsRuntimeContext();
+    return {
+      anonymousId,
+      sessionId,
+      userId: this.getUserId(),
+      url: ctx.url,
+      path: ctx.path,
+      environment: this.options?.environment,
+      release: this.options?.release,
+      browserName: runtime?.browserName,
+      browserVersion: runtime?.browserVersion,
+      osName: runtime?.osName,
+      device: runtime?.device,
+      bot: runtime?.bot,
+      botKind: runtime?.botKind,
+      webdriver: runtime?.webdriver,
+    };
   }
 
   addBreadcrumb(crumb: Partial<import('./types.js').Breadcrumb> & { type?: string; message?: string }): void {
@@ -865,6 +1072,7 @@ export class TalariaClient {
     if (href) this.breadcrumbs.add(navigationBreadcrumb(href, 'navigation'));
     this.tracer?.startNavigation({ name: path, url: href });
     this.schedulePageloadEnd();
+    this.heatmaps?.noteEffect();
     this.captureAutoPageview(path);
   }
 
@@ -1097,12 +1305,14 @@ export class TalariaClient {
     if (!this.options || this.closed) return;
 
     const keepalive = opts?.keepalive ?? false;
+    await this.eventQueue?.flush({ keepalive });
     const spanFlush = this.tracer
       ? this.tracer.flush({ keepalive })
       : Promise.resolve();
-    const analyticsFlush = this.analyticsFacade
-      ? this.analyticsFacade.flush({ keepalive })
-      : Promise.resolve();
+    const analyticsFlush = Promise.all([
+      this.analyticsFacade?.flush({ keepalive }),
+      this.heatmaps?.flush({ keepalive }),
+    ]);
 
     if (!this.transport) {
       await Promise.all([spanFlush, analyticsFlush]);
@@ -1169,6 +1379,14 @@ export class TalariaClient {
 
     this.recorder?.stop();
     this.recorder = null;
+    const heatmaps = this.heatmaps;
+    this.heatmaps = null;
+    heatmaps?.stop();
+    try {
+      await heatmaps?.flushOnHide();
+    } catch {
+      // ignore
+    }
 
     for (const teardown of this.teardowns.splice(0).reverse()) {
       try {
@@ -1199,6 +1417,7 @@ export class TalariaClient {
     this.lastAnalyticsPath = null;
 
     this.options = null;
+    this.eventQueue = null;
     this.transport = null;
     this.replayId = null;
     this.sessionId = null;
@@ -1333,6 +1552,7 @@ export class TalariaClient {
 
     const isErrorLike = level === 'error' || level === 'fatal';
     if (isErrorLike) {
+      this.heatmaps?.noteError();
       this.tracer?.markError();
       if (this.tracer?.isTransactionOpen()) {
         this.clearPageloadTimers();
@@ -1462,33 +1682,31 @@ export class TalariaClient {
     );
 
     try {
-      await ingestEventBatch(this.transport, [
-        {
-          message,
-          environment: this.options.environment,
-          level,
-          eventType: levelToEventType(level),
-          title,
-          stackTrace: args.stackTrace,
-          exception,
-          platform: args.platform,
-          release: this.options.release,
-          commitSha: this.options.commitSha,
-          userId,
-          anonymousId: this.identity?.getAnonymousId() ?? undefined,
-          sessionId: this.sessionId ?? undefined,
-          replayId: replayId ?? undefined,
-          url: currentLocation()?.href,
-          tags: Object.keys(tags).length ? tags : undefined,
-          extraJson: extra ? JSON.stringify(extra) : undefined,
-          userAgent: this.browserContext?.userAgent,
-          timestamp: occurredAt.toISOString(),
-          keepalive: args.keepalive,
-          traceId: this.tracer?.getTraceId() ?? undefined,
-          spanId: this.tracer?.getSpanId() ?? undefined,
-          breadcrumbs: breadcrumbSnapshot,
-        },
-      ]);
+      await this.eventQueue?.enqueue({
+        message,
+        environment: this.options.environment,
+        level,
+        eventType: levelToEventType(level),
+        title,
+        stackTrace: args.stackTrace,
+        exception,
+        platform: args.platform,
+        release: this.options.release,
+        commitSha: this.options.commitSha,
+        userId,
+        anonymousId: this.identity?.getAnonymousId() ?? undefined,
+        sessionId: this.sessionId ?? undefined,
+        replayId: replayId ?? undefined,
+        url: currentLocation()?.href,
+        tags: Object.keys(tags).length ? tags : undefined,
+        extraJson: extra ? JSON.stringify(extra) : undefined,
+        userAgent: this.browserContext?.userAgent,
+        timestamp: occurredAt.toISOString(),
+        keepalive: args.keepalive,
+        traceId: this.tracer?.getTraceId() ?? undefined,
+        spanId: this.tracer?.getSpanId() ?? undefined,
+        breadcrumbs: breadcrumbSnapshot,
+      });
       // Consumed — don't attach the same clip to a later unrelated event.
       if (replayId && replayId === this.linkableReplayId) {
         this.linkableReplayId = null;
@@ -1513,14 +1731,33 @@ export class TalariaClient {
     signal: 'events' | 'spans' | 'replay' | 'analytics',
   ): void {
     const parsed = IngestError.fromUnknown(error);
+    const signalOff = disabledSignal(error);
+    if (signalOff) {
+      if (signalOff === 'events') {
+        this.ingestDisabled = true;
+        this.eventQueue?.disable();
+      } else if (signalOff === 'spans') {
+        this.tracer?.disable();
+        if (this.options) this.options.tracingEnabled = false;
+      } else if (signalOff === 'analytics') {
+        this.analyticsFacade?.disable();
+        this.heatmaps?.disable();
+      } else {
+        this.replayDisabled = true;
+        this.uploadEnabled = false;
+      }
+      return;
+    }
     if (parsed.isScopeOnly) {
       if (signal === 'events') {
         if (this.ingestDisabled) return;
         this.ingestDisabled = true;
+        this.eventQueue?.disable();
       } else if (signal === 'spans') {
         this.tracer?.disable();
       } else if (signal === 'analytics') {
         this.analyticsFacade?.disable();
+        this.heatmaps?.disable();
       } else {
         this.replayDisabled = true;
         this.uploadEnabled = false;
@@ -1532,8 +1769,13 @@ export class TalariaClient {
       );
       return;
     }
+    const tombstone = tombstoneFromError(error, Date.now());
+    if (tombstone && this.options) {
+      writePolicyCache(browserPolicyStorage(), this.options.apiKey, tombstone);
+    }
     if (signal === 'analytics' && !parsed.isGlobalCredentialFailure) {
       this.analyticsFacade?.disable();
+      this.heatmaps?.disable();
       console.warn(
         '@newtalaria/browser: analytics ingest disabled after permanent client error',
         error,
@@ -1548,9 +1790,11 @@ export class TalariaClient {
       return;
     }
     this.ingestDisabled = true;
+    this.eventQueue?.disable();
     this.replayDisabled = true;
     this.tracer?.disable();
     this.analyticsFacade?.disable();
+    this.heatmaps?.disable();
     console.warn(
       '@newtalaria/browser: event ingest disabled after permanent client error',
       error,

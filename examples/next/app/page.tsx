@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import { boomAction } from './actions';
 
 const dsn =
-  process.env.NEXT_PUBLIC_TALARIA_DSN ?? 'https://api.newtalaria.com';
+  process.env.NEXT_PUBLIC_TALARIA_DSN ?? 'https://ingest.newtalaria.com';
 const apiKey = process.env.NEXT_PUBLIC_TALARIA_API_KEY ?? '';
 const environment =
   process.env.NEXT_PUBLIC_TALARIA_ENVIRONMENT ?? 'development';

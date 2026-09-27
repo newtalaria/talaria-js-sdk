@@ -40,6 +40,7 @@ describe('captureException exception payload', () => {
     at run (http://app.example.com/app.js:2:1)`;
 
       await client.captureException(err);
+      await client.flush();
       await client.close();
 
       assert.ok(body);
@@ -114,6 +115,7 @@ describe('captureException exception payload', () => {
           keep_me: true,
         },
       });
+      await client.flush();
       await client.close();
 
       const input = eventInput(body);
@@ -157,6 +159,7 @@ describe('captureException exception payload', () => {
       await client.captureException(err, {
         mechanism: { type: 'unhandledrejection', handled: false },
       });
+      await client.flush();
       await client.close();
 
       const input = eventInput(body);
@@ -194,6 +197,7 @@ describe('captureException exception payload', () => {
       });
 
       await client.captureMessage('hello from logger');
+      await client.flush();
       await client.close();
 
       const input = eventInput(body);

@@ -25,7 +25,7 @@
       const dsn =
         params.get('dsn') ||
         localStorage.getItem('TALARIA_DSN') ||
-        'https://api.newtalaria.com';
+        'https://ingest.newtalaria.com';
       const apiKey =
         params.get('apiKey') || localStorage.getItem('TALARIA_API_KEY') || '';
       const environment =
@@ -39,7 +39,7 @@
           dsn: dsn,
           apiKey: apiKey,
           environment: environment,
-          enableTracing: true,
+          remoteConfig: true,
           replaysOnErrorSampleRate: 1,
         });
         status.className = 'status';

@@ -39,6 +39,7 @@ describe('runtime scope APIs', () => {
         message: 'signed in',
       });
       await client.captureException(new Error('after sign-in'));
+      await client.flush();
       await client.close();
 
       const input = eventInput(body);

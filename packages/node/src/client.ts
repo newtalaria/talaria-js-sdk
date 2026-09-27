@@ -1,24 +1,34 @@
 import {
   AnalyticsFacade,
   createMemoryStorage,
+  disabledSignal,
+  documentIsFresh,
+  EventIngestQueue,
+  fetchSdkConfig,
   IdentityStore,
-  ingestEventBatch,
   IngestError,
-  isTracingEnabled,
   mergeTags,
   normalizeBreadcrumb,
   normalizeEnvironment,
   normalizeSeverity,
-  resolveTracesSampleRate,
+  readPolicyCache,
   Scope,
   ServerpodTransport,
   severityAtLeast,
+  tombstoneFromError,
+  tombstoneIsQuiet,
+  writePolicyCache,
   type Breadcrumb,
   type CaptureContext,
+  type SdkConfigDocument,
+  type SdkPolicyStorage,
   type SeverityLevel,
   type Span,
   type UserContext,
 } from '@newtalaria/core';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname } from 'node:path';
 import { SDK_NAME, SDK_VERSION } from './sdk_meta.js';
 import { NodeTracer } from './tracer.js';
 import type { TalariaNodeInitOptions } from './types.js';
@@ -32,11 +42,14 @@ export class TalariaNodeClient {
     minLevel: SeverityLevel;
     tracingEnabled: boolean;
     tracesSampleRate: number;
+    sampleRate: number;
     disableDefaultIntegrations: boolean;
+    remoteConfig: boolean;
   }) | null = null;
   private transport: ServerpodTransport | null = null;
   private tracer: NodeTracer | null = null;
   private readonly scope = new Scope();
+  private eventQueue: EventIngestQueue | null = null;
   private sessionId: string | null = null;
   private identity: IdentityStore | null = null;
   private analyticsFacade: AnalyticsFacade | null = null;
@@ -57,49 +70,120 @@ export class TalariaNodeClient {
       baseUrl,
       environment,
       minLevel: raw.minLevel ?? 'debug',
-      tracingEnabled: isTracingEnabled(raw),
-      tracesSampleRate: resolveTracesSampleRate(raw),
+      tracingEnabled: false,
+      tracesSampleRate: 0,
+      sampleRate: 1,
+      remoteConfig: raw.remoteConfig !== false,
       disableDefaultIntegrations: raw.disableDefaultIntegrations === true,
     };
     this.transport = new ServerpodTransport({
       baseUrl,
       apiKey: raw.apiKey,
     });
+    this.eventQueue = EventIngestQueue.forTransport(this.transport, (error) => {
+      console.warn('@newtalaria/node: event ingest failed', error);
+      if (IngestError.fromUnknown(error).isPermanent) {
+        this.disable(error, 'events');
+      }
+    });
+    const flushQueuedEvents = () => {
+      void this.eventQueue?.flush();
+    };
+    process.on('beforeExit', flushQueuedEvents);
+    this.teardowns.push(() => process.off('beforeExit', flushQueuedEvents));
     this.identity = new IdentityStore(createMemoryStorage(), {
       initialAnonymousId: raw.anonymousId,
     });
     this.sessionId = this.identity.touchSession();
     this.analyticsFacade = this.createAnalyticsFacade();
-    if (raw.enableAnalytics || raw.analyticsEnabled) {
-      this.analyticsFacade.optIn();
-    }
     if (raw.userId) this.scope.setUser({ id: raw.userId });
     if (raw.tags) this.scope.setTags(raw.tags);
 
-    if (this.options.tracingEnabled) {
+    if (!this.options.disableDefaultIntegrations) {
+      this.installProcessHandlers();
+    }
+    this.bootstrapPolicy();
+  }
+
+  applySdkConfig(document: SdkConfigDocument): void {
+    if (!this.options || !this.transport || document.schemaVersion !== 1) return;
+    if (document.unchanged) return;
+    if (document.active === false) {
+      this.ingestDisabled = true;
+      this.eventQueue?.disable();
+      this.tracer?.disable();
+      this.analyticsFacade?.disable();
+      return;
+    }
+    const eventsRate = document.events?.sampleRate;
+    this.options.sampleRate =
+      eventsRate === null || eventsRate === undefined ? 1 : Math.min(1, Math.max(0, eventsRate));
+    const tracingOn = Boolean(document.tracing?.enabled);
+    this.options.tracingEnabled = tracingOn;
+    this.options.tracesSampleRate = tracingOn
+      ? Math.min(1, Math.max(0, document.tracing?.tracesSampleRate ?? 0))
+      : 0;
+    if (tracingOn && !this.tracer) {
       this.tracer = new NodeTracer({
         transport: this.transport,
         sampleRate: this.options.tracesSampleRate,
         resource: {
-          'service.name': raw.serviceName || 'node',
-          'deployment.environment': environment,
+          'service.name': this.options.serviceName || 'node',
+          'deployment.environment': this.options.environment,
           'telemetry.sdk.name': SDK_NAME,
           'telemetry.sdk.version': SDK_VERSION,
         },
-        environment,
-        release: raw.release,
+        environment: this.options.environment,
+        release: this.options.release,
         getUserId: () => this.scope.getUserId(),
         getSessionId: () => this.sessionId,
         getAnonymousId: () => this.identity?.getAnonymousId() ?? null,
         onPermanentIngestError: (error) => this.disable(error, 'spans'),
       });
-      // Outgoing HTTP patch lives in `index.ts` so `@newtalaria/node/api`
-      // stays free of `node:http` for Next.js.
+    } else if (!tracingOn) {
+      this.tracer?.disable();
     }
+    if (document.analytics?.enabled) this.analyticsFacade?.optIn();
+    else this.analyticsFacade?.disable();
+  }
 
-    if (!this.options.disableDefaultIntegrations) {
-      this.installProcessHandlers();
+  private bootstrapPolicy(): void {
+    if (!this.options || !this.transport || !this.options.remoteConfig) return;
+    const storage = nodePolicyStorage();
+    const now = Date.now();
+    const cached = readPolicyCache(storage, this.options.apiKey);
+    if (cached && tombstoneIsQuiet(cached, now)) {
+      this.ingestDisabled = true;
+      this.eventQueue?.disable();
+      return;
     }
+    if (cached?.kind === 'document' && cached.document) {
+      this.applySdkConfig(cached.document);
+      if (documentIsFresh(cached, now)) return;
+    }
+    void fetchSdkConfig(this.transport, {
+      sdkName: SDK_NAME,
+      sdkVersion: SDK_VERSION,
+      platform: 'node',
+      revision: cached?.document?.revision,
+    })
+      .then((document) => {
+        if (!this.options) return;
+        if (!document.unchanged) this.applySdkConfig(document);
+        const stored = document.unchanged && cached?.document ? cached.document : document;
+        writePolicyCache(storage, this.options.apiKey, {
+          kind: 'document',
+          fetchedAt: Date.now(),
+          document: stored,
+        });
+      })
+      .catch((error: unknown) => {
+        const tombstone = tombstoneFromError(error, Date.now());
+        if (!tombstone || !this.options) return;
+        writePolicyCache(storage, this.options.apiKey, tombstone);
+        this.ingestDisabled = true;
+        this.eventQueue?.disable();
+      });
   }
 
   setUser(user: UserContext | null): void {
@@ -203,6 +287,7 @@ export class TalariaNodeClient {
 
   async flush(): Promise<void> {
     await Promise.all([
+      this.eventQueue?.flush() ?? Promise.resolve(),
       this.tracer?.flush() ?? Promise.resolve(),
       this.analyticsFacade?.flush() ?? Promise.resolve(),
     ]);
@@ -254,8 +339,7 @@ export class TalariaNodeClient {
     const tags = mergeTags(this.options.tags, this.scope.getTags(), args.context?.tags);
     const extra = args.context?.extra;
     try {
-      await ingestEventBatch(this.transport, [
-        {
+      await this.eventQueue?.enqueue({
           message: args.message,
           environment: this.options.environment,
           level,
@@ -292,8 +376,7 @@ export class TalariaNodeClient {
           traceId: this.tracer?.getTraceId() ?? undefined,
           spanId: this.tracer?.getSpanId() ?? undefined,
           breadcrumbs: this.breadcrumbs.length ? this.breadcrumbs : undefined,
-        },
-      ]);
+        });
     } catch (error) {
       console.warn('@newtalaria/node: event ingest failed', error);
       if (IngestError.fromUnknown(error).isPermanent) {
@@ -304,10 +387,27 @@ export class TalariaNodeClient {
 
   private disable(error: unknown, signal: 'events' | 'spans' | 'analytics'): void {
     const parsed = IngestError.fromUnknown(error);
+    const signalOff = disabledSignal(error);
+    if (signalOff === 'spans') {
+      this.tracer?.disable();
+      return;
+    }
+    if (signalOff === 'analytics') {
+      this.analyticsFacade?.disable();
+      return;
+    }
+    if (signalOff === 'events') {
+      this.ingestDisabled = true;
+      this.eventQueue?.disable();
+      return;
+    }
     if (parsed.isScopeOnly) {
       if (signal === 'spans') this.tracer?.disable();
       else if (signal === 'analytics') this.analyticsFacade?.disable();
-      else this.ingestDisabled = true;
+      else {
+        this.ingestDisabled = true;
+        this.eventQueue?.disable();
+      }
       return;
     }
     if (signal === 'analytics' && !parsed.isGlobalCredentialFailure) {
@@ -315,6 +415,7 @@ export class TalariaNodeClient {
       return;
     }
     this.ingestDisabled = true;
+    this.eventQueue?.disable();
     this.tracer?.disable();
     this.analyticsFacade?.disable();
     console.warn(
@@ -322,4 +423,30 @@ export class TalariaNodeClient {
       error,
     );
   }
+}
+
+function nodePolicyStorage(): SdkPolicyStorage {
+  return {
+    get: (key) => {
+      try {
+        return readFileSync(nodePolicyPath(key), 'utf8');
+      } catch {
+        return null;
+      }
+    },
+    set: (key, value) => {
+      try {
+        const path = nodePolicyPath(key);
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, value);
+      } catch {
+        /* read-only filesystem */
+      }
+    },
+    remove: () => {},
+  };
+}
+
+function nodePolicyPath(key: string): string {
+  return `${tmpdir()}/talaria/${key.replace(/[^\w.-]/g, '_')}.json`;
 }

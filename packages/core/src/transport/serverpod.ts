@@ -29,7 +29,7 @@ export class ServerpodTransport {
     endpoint: string,
     method: string,
     body: Record<string, unknown>,
-    opts?: { keepalive?: boolean },
+    opts?: { keepalive?: boolean; signal?: AbortSignal },
   ): Promise<unknown> {
     const url = `${this.baseUrl}/${endpoint}/${method}`;
     const headers: Record<string, string> = {
@@ -45,6 +45,9 @@ export class ServerpodTransport {
     };
     if (opts?.keepalive) {
       init.keepalive = true;
+    }
+    if (opts?.signal) {
+      init.signal = opts.signal;
     }
 
     const response = await fetch(url, init);

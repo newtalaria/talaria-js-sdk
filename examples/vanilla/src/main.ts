@@ -1,7 +1,7 @@
 import { Talaria } from '@newtalaria/browser';
 import './style.css';
 
-const dsn = import.meta.env.VITE_TALARIA_DSN || 'https://api.newtalaria.com';
+const dsn = import.meta.env.VITE_TALARIA_DSN || 'https://ingest.newtalaria.com';
 const apiKey = import.meta.env.VITE_TALARIA_API_KEY || '';
 const environment = import.meta.env.VITE_TALARIA_ENVIRONMENT || 'development';
 const ready = Boolean(apiKey);
@@ -11,7 +11,7 @@ if (ready) {
     dsn,
     apiKey,
     environment,
-    enableTracing: true,
+    remoteConfig: true,
     replaysOnErrorSampleRate: 1,
   });
   Talaria.setUser({ id: 'demo-user' });

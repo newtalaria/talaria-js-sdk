@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { TalariaClient } from '../src/client.ts';
+import { policyDocument } from './policy_fixture.ts';
 
 function installMemoryLocalStorage(): Map<string, string> {
   const map = new Map<string, string>();
@@ -60,6 +61,7 @@ describe('browser analytics + identity', () => {
       );
 
       await client.captureException(new Error('boom'));
+      await client.flush();
       const eventPost = posts.find((p) => p.url.includes('/events/ingestBatch'));
       assert.ok(eventPost);
       const input = eventPost.body.input as Record<string, unknown>;
@@ -166,11 +168,13 @@ describe('browser analytics + identity', () => {
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         environment: 'development',
-        enableAnalytics: true,
-        replaysSessionSampleRate: 0,
-        replaysOnErrorSampleRate: 0,
+        remoteConfig: false,
         disableDefaultIntegrations: true,
       });
+      client.applySdkConfig(
+        policyDocument({ analytics: { enabled: true }, heatmaps: { enabled: true } }),
+      );
+      client.analytics.optIn();
       await client.analytics.flush();
       assert.ok(names.includes('page:$pageview'));
       const countAfterInit = names.filter((n) => n === 'page:$pageview').length;

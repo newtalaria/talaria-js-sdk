@@ -21,6 +21,7 @@ import {
   type RrwebEvent,
 } from '../src/replay/segment_buffer.ts';
 import { TalariaClient } from '../src/client.ts';
+import { policyDocument } from './policy_fixture.ts';
 import { parseSegmentBatchResponse } from '../src/transport/replays.ts';
 import {
   consoleBreadcrumb,
@@ -417,8 +418,11 @@ describe('permanent ingest circuit breaker', () => {
       });
 
       await client.captureException(new Error('boom'));
+      await client.flush();
       await client.captureException(new Error('boom again'));
+      await client.flush();
       await client.captureMessage('should not ingest');
+      await client.flush();
 
       assert.equal(ingestCalls, 1);
       assert.equal(
@@ -468,7 +472,9 @@ describe('permanent ingest circuit breaker', () => {
       });
 
       await client.captureException(new Error('boom'));
+      await client.flush();
       await client.captureException(new Error('boom again'));
+      await client.flush();
 
       assert.equal(ingestCalls, 2);
       await client.close();
@@ -504,7 +510,9 @@ describe('permanent ingest circuit breaker', () => {
       });
 
       await client.captureException(new Error('boom'));
+      await client.flush();
       await client.captureException(new Error('boom again'));
+      await client.flush();
 
       assert.equal(ingestCalls, 2);
       await client.close();
@@ -610,12 +618,24 @@ describe('replay segment batch + breadcrumbs', () => {
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         environment: 'test',
-        replaysSessionSampleRate: 0,
-        replaysOnErrorSampleRate: 1,
+        remoteConfig: false,
         disableDefaultIntegrations: true,
       });
+      client.applySdkConfig(
+        policyDocument({
+          replay: {
+            enabled: true,
+            sessionSampleRate: 0,
+            errorSampleRate: 1,
+            maxDurationMs: 300000,
+            maskAllInputs: true,
+            blockSelectors: [],
+          },
+        }),
+      );
       seedErrorClipBuffer(client);
       await client.captureException(new Error('$current_tag is not defined'));
+      await client.flush();
       await client.close();
 
       const batchCalls = urls.filter((u) =>
@@ -650,6 +670,7 @@ describe('replay segment batch + breadcrumbs', () => {
       seedErrorClipBuffer(client);
 
       await client.captureException(new Error('boom'));
+      await client.flush();
 
       const ingest = eventBodies.find((body) => {
         const input = body.input as Record<string, unknown> | undefined;

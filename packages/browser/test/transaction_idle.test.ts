@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, mock } from 'node:test';
 import { TalariaClient } from '../src/client.ts';
+import { policyDocument } from './policy_fixture.ts';
 import { RecordingSpan } from '../src/tracing/span.ts';
 import { Tracer } from '../src/tracing/tracer.ts';
 
@@ -62,12 +63,10 @@ function initTracedClient(): TalariaClient {
     dsn: 'http://localhost:8080',
     apiKey: 'tal_live_test',
     environment: 'development',
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 0,
+    remoteConfig: false,
     disableDefaultIntegrations: true,
-    enableTracing: true,
-    tracesSampleRate: 1,
   });
+  client.applySdkConfig(policyDocument());
   return client;
 }
 
@@ -139,6 +138,7 @@ describe('client transaction idle and error finalization', () => {
     });
 
     await client.captureException(new Error('Talaria browser logging test'));
+      await client.flush();
 
     assert.equal(tracer.isTransactionOpen(), false);
     assert.equal(root.data.status, 'error');
@@ -186,6 +186,7 @@ describe('client transaction idle and error finalization', () => {
     });
 
     await client.captureException(new Error('Talaria browser logging test'));
+      await client.flush();
 
     assert.equal(root.isEnded(), true);
     assert.equal(root.data.status, 'ok');

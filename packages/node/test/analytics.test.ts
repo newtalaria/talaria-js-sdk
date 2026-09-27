@@ -57,9 +57,16 @@ describe('TalariaNodeClient analytics', () => {
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         environment: 'development',
+        remoteConfig: false,
         disableDefaultIntegrations: true,
-        enableAnalytics: true,
         anonymousId: 'node-anon',
+      });
+      client.applySdkConfig({
+        schemaVersion: 1,
+        revision: 'test',
+        active: true,
+        analytics: { enabled: true },
+        tracing: { enabled: false, tracesSampleRate: 0 },
       });
       await client.captureException(new Error('node boom'));
       client.analytics.identify('user_123', { plan: 'team' });

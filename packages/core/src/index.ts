@@ -61,6 +61,11 @@ export {
   type IngestEventParams,
 } from './transport/events.js';
 export {
+  EVENT_FLUSH_INTERVAL_MS,
+  EventIngestQueue,
+  MAX_EVENT_BATCH,
+} from './transport/event_queue.js';
+export {
   ingestSpanBatch,
   type IngestSpanParams,
   type SpanEventInput,
@@ -120,6 +125,27 @@ export {
   navigationBreadcrumb,
   normalizeBreadcrumb,
 } from './tracing/breadcrumbs.js';
+
+export {
+  SDK_CONFIG_SCHEMA,
+  cacheKey,
+  clampTtlSeconds,
+  clearPolicyCache,
+  disabledSignal,
+  documentIsFresh,
+  fetchSdkConfig,
+  keyHash,
+  parseSdkConfig,
+  readPolicyCache,
+  reportDiscards,
+  tombstoneFromError,
+  tombstoneIsQuiet,
+  writePolicyCache,
+  type SdkConfigDocument,
+  type SdkMeterPolicy,
+  type SdkPolicyCacheEntry,
+  type SdkPolicyStorage,
+} from './policy/sdk_policy.js';
 
 export { createId } from './utils/id.js';
 export { normalizeEnvironment } from './utils/environment.js';

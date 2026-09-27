@@ -150,16 +150,17 @@ export class AnalyticsFacade {
     this.enqueue('track', resolved, properties, options);
   }
 
+  /** Returns the queued event id, or `undefined` when nothing was queued. */
   page(
     nameOrProps?: string | Record<string, unknown>,
     properties?: Record<string, unknown>,
-  ): void {
+  ): string | undefined {
     const { name, props } = splitNameAndProps(
       nameOrProps,
       properties,
       ANALYTICS_DEFAULT_NAMES.page,
     );
-    this.enqueue('page', name, props);
+    return this.enqueue('page', name, props);
   }
 
   screen(
@@ -200,10 +201,10 @@ export class AnalyticsFacade {
     name: string,
     properties?: Record<string, unknown>,
     options?: AnalyticsCallOptions,
-  ): void {
-    if (!this.isEnabled()) return;
+  ): string | undefined {
+    if (!this.isEnabled()) return undefined;
     const identity = this.bindings.getIdentity();
-    if (!identity) return;
+    if (!identity) return undefined;
 
     const ctx = this.bindings.getPageContext();
     const sessionId = identity.touchSession({
@@ -223,9 +224,9 @@ export class AnalyticsFacade {
       console.warn(
         `${this.bindings.logLabel}: analytics.${kind} requires userId and/or anonymousId`,
       );
-      return;
+      return undefined;
     }
-    if (!anonymousId || !sessionId) return;
+    if (!anonymousId || !sessionId) return undefined;
 
     const firstTouch = identity.getFirstTouch();
     const runtime = this.bindings.getRuntimeContext?.();
@@ -270,6 +271,7 @@ export class AnalyticsFacade {
     };
     this.queue.push(event);
     void this.flush();
+    return event.eventId;
   }
 
   private async flushOnce(opts?: { keepalive?: boolean }): Promise<void> {
