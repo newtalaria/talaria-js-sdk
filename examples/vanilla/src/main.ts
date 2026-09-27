@@ -12,7 +12,6 @@ if (ready) {
     apiKey,
     environment,
     remoteConfig: true,
-    replaysOnErrorSampleRate: 1,
   });
   Talaria.setUser({ id: 'demo-user' });
 }

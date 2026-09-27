@@ -15,10 +15,9 @@ Use **disjoint entrypoints** so the App Router never bundles Node `http` into th
 import { initClient } from '@newtalaria/nextjs/client';
 
 initClient({
-  dsn: process.env.NEXT_PUBLIC_TALARIA_DSN!,
+  dsn: 'https://ingest.newtalaria.com',
   apiKey: process.env.NEXT_PUBLIC_TALARIA_API_KEY!,
   environment: process.env.NEXT_PUBLIC_TALARIA_ENVIRONMENT ?? 'production',
-  replaysOnErrorSampleRate: 1,
 });
 ```
 
@@ -27,10 +26,9 @@ initClient({
 import { initServer } from '@newtalaria/nextjs/server';
 
 initServer({
-  dsn: process.env.TALARIA_DSN!,
+  dsn: 'https://ingest.newtalaria.com',
   apiKey: process.env.TALARIA_API_KEY!,
   environment: process.env.TALARIA_ENVIRONMENT ?? 'production',
-  enableTracing: true,
 });
 ```
 

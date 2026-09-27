@@ -12,7 +12,6 @@ if (apiKey) {
     apiKey,
     environment: import.meta.env.VITE_TALARIA_ENVIRONMENT || 'development',
     remoteConfig: true,
-    replaysOnErrorSampleRate: 1,
   });
   Talaria.setUser({ id: 'demo-user' });
 }

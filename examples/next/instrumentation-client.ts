@@ -7,6 +7,5 @@ if (apiKey) {
     apiKey,
     environment: process.env.NEXT_PUBLIC_TALARIA_ENVIRONMENT ?? 'development',
     remoteConfig: true,
-    replaysOnErrorSampleRate: 1,
   });
 }
