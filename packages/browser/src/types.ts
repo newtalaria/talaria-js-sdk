@@ -207,6 +207,7 @@ export interface ResolvedOptions {
   tracingEnabled: boolean;
   tracesSampleRate: number;
   enableAnalytics: boolean;
+  enableFlags: boolean;
   heatmaps: boolean;
   remoteConfig: boolean;
   publicAnalytics: boolean;

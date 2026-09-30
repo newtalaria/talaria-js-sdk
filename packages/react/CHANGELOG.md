@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- Feature flags client parity with Dart (`Talaria.flags`).
+
 ## 0.4.1
 
 - Package docs point at the marketing guides.

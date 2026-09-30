@@ -1,18 +1,25 @@
 import type { Breadcrumb } from '../types.js';
 
 export const MAX_BREADCRUMBS = 50;
+export const MAX_QUERY_BREADCRUMBS = 15;
+export const MAX_OTHER_BREADCRUMBS = 35;
 
 export type { Breadcrumb };
 
-/** Ring buffer of the last {@link MAX_BREADCRUMBS} client breadcrumbs. */
+/** Ring buffer. Query crumbs cannot evict other crumbs. */
 export class BreadcrumbBuffer {
   private items: Breadcrumb[] = [];
 
   add(crumb: Breadcrumb): void {
-    this.items.push(crumb);
-    if (this.items.length > MAX_BREADCRUMBS) {
-      this.items.splice(0, this.items.length - MAX_BREADCRUMBS);
+    const isQuery = crumb.type === 'query';
+    const cap = isQuery ? MAX_QUERY_BREADCRUMBS : MAX_OTHER_BREADCRUMBS;
+    const sameTier = this.items.filter((item) => (item.type === 'query') === isQuery);
+    const overflow = sameTier.length - (cap - 1);
+    if (overflow > 0) {
+      const drop = new Set(sameTier.slice(0, overflow));
+      this.items = this.items.filter((item) => !drop.has(item));
     }
+    this.items.push(crumb);
   }
 
   /** Last `limit` crumbs (default: the whole buffer, capped at 50). */

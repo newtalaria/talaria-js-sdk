@@ -52,6 +52,9 @@ export const Talaria = {
   get analytics() {
     return getNodeClient().analytics;
   },
+  get flags() {
+    return getNodeClient().flags;
+  },
 };
 
 /** Start a SERVER span for this request and reset state when the response finishes. */

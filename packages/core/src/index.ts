@@ -29,6 +29,25 @@ export {
 } from './analytics.js';
 
 export {
+  FEATURE_FLAG_CALLED,
+  FLAGS_CACHE_KEY_PREFIX,
+  MAX_STAMP_FLAGS,
+  TalariaFlags,
+  type FlagsClientOptions,
+} from './flags/flags_client.js';
+export {
+  decodeValueJson,
+  encodeValueJson,
+  flagEvaluationFromWire,
+  flagEvaluationToCacheJson,
+  type FlagEvaluationResult,
+} from './flags/flag_evaluation.js';
+export {
+  evaluateFlags,
+  type EvaluateFlagsInput,
+} from './transport/flags.js';
+
+export {
   ANONYMOUS_ID_KEY,
   IdentityStore,
   SESSION_ID_KEY,
@@ -122,6 +141,8 @@ export {
   BreadcrumbBuffer,
   consoleBreadcrumb,
   MAX_BREADCRUMBS,
+  MAX_OTHER_BREADCRUMBS,
+  MAX_QUERY_BREADCRUMBS,
   navigationBreadcrumb,
   normalizeBreadcrumb,
 } from './tracing/breadcrumbs.js';

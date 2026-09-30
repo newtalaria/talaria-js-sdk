@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+
+## 0.4.2
+
+- Add `Talaria.flags` (`boolVariation` / `stringVariation` / `jsonVariation`, `setContext`) via `POST /flags/evaluate`.
+- Apply `flags.enabled` from `sdk/getConfig`. Stamp up to 20 `flag.<key>` tags on events, spans, and analytics.
+- Cache evaluations in localStorage (browser) / memory (Node); poll on the policy TTL.
+
 ## 0.4.1
 
 - Package docs point at the marketing guides.

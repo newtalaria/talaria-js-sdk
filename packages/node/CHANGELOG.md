@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+
+## 0.4.2
+
+- Identical SQL under one parent is one span with `db.query.count` and `db.query.duration_sum_ms`. Queries of 200ms or more, and failed queries, stay their own spans.
+- A transaction stores at most 200 spans and keeps 32 slots for non-SQL spans. The root records `dropped_span_count` when a span is dropped.
+- `withoutQuerySpans` and `setRecordQuerySpans(false)` turn automatic SQL spans off for one run.
+- Query breadcrumbs use at most 15 of the 50 breadcrumb slots.
+- Add `Talaria.flags` (`boolVariation` / `stringVariation` / `jsonVariation`, `setContext`). Honors `flags.enabled` from `sdk/getConfig` and stamps `flag.<key>` on events, spans, and analytics.
+
 ## 0.4.1
 
 - Package docs point at the marketing guides.

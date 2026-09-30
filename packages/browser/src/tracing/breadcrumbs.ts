@@ -5,6 +5,8 @@ export {
   BreadcrumbBuffer,
   consoleBreadcrumb,
   MAX_BREADCRUMBS,
+  MAX_OTHER_BREADCRUMBS,
+  MAX_QUERY_BREADCRUMBS,
   navigationBreadcrumb,
   normalizeBreadcrumb,
 } from '@newtalaria/core';

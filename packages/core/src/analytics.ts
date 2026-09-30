@@ -67,6 +67,11 @@ export interface AnalyticsBindings {
   onPermanentError: (error: unknown) => void;
   /** Fired the first time consent is granted (auto `$pageview` on web). */
   onOptIn?: () => void;
+  /**
+   * Extra properties merged into every analytics event (e.g. flag stamps).
+   * Caller values win on key conflict.
+   */
+  getExtraProperties?: () => Record<string, unknown> | undefined;
   now?: () => Date;
   createId?: () => string;
 }
@@ -80,6 +85,14 @@ function stringifyProperties(
   } catch {
     return undefined;
   }
+}
+
+function mergeProperties(
+  base?: Record<string, unknown>,
+  override?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (!base && !override) return undefined;
+  return { ...(base ?? {}), ...(override ?? {}) };
 }
 
 function resolveName(
@@ -230,6 +243,10 @@ export class AnalyticsFacade {
 
     const firstTouch = identity.getFirstTouch();
     const runtime = this.bindings.getRuntimeContext?.();
+    const enriched = mergeProperties(
+      this.bindings.getExtraProperties?.(),
+      properties,
+    );
     const event: IngestAnalyticsEventParams = {
       eventId: this.makeId(),
       name,
@@ -253,7 +270,7 @@ export class AnalyticsFacade {
       utmCampaign: firstTouch.utmCampaign,
       utmTerm: firstTouch.utmTerm,
       utmContent: firstTouch.utmContent,
-      propertiesJson: stringifyProperties(properties),
+      propertiesJson: stringifyProperties(enriched),
       browserName: runtime?.browserName,
       browserVersion: runtime?.browserVersion,
       browserEngine: runtime?.browserEngine,

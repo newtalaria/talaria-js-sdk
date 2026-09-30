@@ -22,6 +22,8 @@ export interface NodeTracerOptions {
   transport: ServerpodTransport;
   sampleRate: number;
   resource: Record<string, string>;
+  /** Merged into `resource` at flush (e.g. flag stamps). */
+  getResourceExtras?: () => Record<string, string>;
   environment: string;
   release?: string;
   getUserId: () => string | undefined;
@@ -38,12 +40,19 @@ export interface StartSpanOptions {
 }
 
 const MAX_SPANS = 200;
+const MAX_SQL_SPANS = 168;
+const RESERVED_NON_SQL = 32;
+const SLOW_QUERY_MS = 200;
 
 export class NodeTracer {
   private readonly options: NodeTracerOptions;
   private sampled = false;
   private hasError = false;
   private spanCount = 0;
+  private sqlCount = 0;
+  private droppedCount = 0;
+  private recordQuerySpans = true;
+  private readonly queryGroups = new Map<string, RecordingSpan>();
   private root: RecordingSpan | null = null;
   private readonly ended: RecordingSpan[] = [];
   private flushChain: Promise<void> = Promise.resolve();
@@ -70,6 +79,24 @@ export class NodeTracer {
     return getCurrentSpanContext()?.spanId ?? this.root?.context.spanId ?? null;
   }
 
+  get recordsQuerySpans(): boolean {
+    return this.recordQuerySpans;
+  }
+
+  setRecordQuerySpans(record: boolean): void {
+    this.recordQuerySpans = record;
+  }
+
+  async withoutQuerySpans<T>(fn: () => T | Promise<T>): Promise<T> {
+    const previous = this.recordQuerySpans;
+    this.recordQuerySpans = false;
+    try {
+      return await fn();
+    } finally {
+      this.recordQuerySpans = previous;
+    }
+  }
+
   markError(): void {
     this.hasError = true;
     this.sampled = true;
@@ -88,6 +115,9 @@ export class NodeTracer {
     this.sampled = parent?.sampled ?? headSample(this.options.sampleRate);
     this.hasError = false;
     this.spanCount = 0;
+    this.sqlCount = 0;
+    this.droppedCount = 0;
+    this.queryGroups.clear();
     this.ended.length = 0;
     const ctx: SpanContext = { traceId, spanId, sampled: this.sampled };
     setCurrentSpanContext(ctx);
@@ -108,10 +138,14 @@ export class NodeTracer {
 
   endRoot(): void {
     if (!this.root || this.root.isEnded()) return;
+    if (this.droppedCount > 0) {
+      this.root.setAttribute('dropped_span_count', String(this.droppedCount));
+    }
     if (this.root.data.status === 'unset' && this.isSampled() && !this.hasError) {
       this.root.setStatus('ok');
     }
     this.root.end();
+    this.recordQuerySpans = true;
   }
 
   resetRequestState(): void {
@@ -121,6 +155,10 @@ export class NodeTracer {
     this.root = null;
     this.ended.length = 0;
     this.spanCount = 0;
+    this.sqlCount = 0;
+    this.droppedCount = 0;
+    this.queryGroups.clear();
+    this.recordQuerySpans = true;
   }
 
   flush(opts?: { keepalive?: boolean }): Promise<void> {
@@ -141,16 +179,30 @@ export class NodeTracer {
     name: string,
     opts: StartSpanOptions & { parent?: SpanContext | null; context?: SpanContext },
   ): Span {
-    if (this.disabled || this.spanCount >= MAX_SPANS) {
+    const parent = opts.parent;
+    const attributes = opts.attributes ? stringifyAttrMap(opts.attributes) : {};
+    const queryText = attributes['db.query.text'];
+    const isQuery = typeof queryText === 'string' && queryText.length > 0;
+    const isRoot = !parent;
+    if (this.disabled || (!isRoot && isQuery && !this.recordQuerySpans)) {
       return new NoopSpan(
         opts.context ?? {
-          traceId: opts.parent?.traceId ?? createTraceId(),
+          traceId: parent?.traceId ?? createTraceId(),
           spanId: createSpanId(),
           sampled: false,
         },
       );
     }
-    const parent = opts.parent;
+    if (!isRoot && !isQuery && this.spanCount >= MAX_SPANS) {
+      this.droppedCount += 1;
+      return new NoopSpan(
+        opts.context ?? {
+          traceId: parent?.traceId ?? createTraceId(),
+          spanId: createSpanId(),
+          sampled: false,
+        },
+      );
+    }
     const ctx =
       opts.context ??
       ({
@@ -158,7 +210,9 @@ export class NodeTracer {
         spanId: createSpanId(),
         sampled: this.isSampled(),
       } satisfies SpanContext);
-    this.spanCount += 1;
+    if (!isQuery) {
+      this.spanCount += 1;
+    }
     return new RecordingSpan(
       {
         context: ctx,
@@ -167,16 +221,49 @@ export class NodeTracer {
         kind: opts.kind ?? 'internal',
         startTime: opts.startTime ?? new Date(),
         status: 'unset' as SpanStatus,
-        attributes: opts.attributes ? stringifyAttrMap(opts.attributes) : {},
+        attributes,
         events: [],
         links: [],
         ended: false,
         flushed: false,
       },
       (span) => {
-        this.ended.push(span);
+        this.onSpanEnd(span, isQuery);
       },
     );
+  }
+
+  private onSpanEnd(span: RecordingSpan, isQuery: boolean): void {
+    if (!isQuery) {
+      this.ended.push(span);
+      return;
+    }
+    const text = span.data.attributes['db.query.text'] ?? '';
+    const duration = spanDurationMs(span);
+    const failed = span.data.status === 'error';
+    const key = `${span.data.parentSpanId ?? ''}\0${text}`;
+    const group = this.queryGroups.get(key);
+    if (!failed && duration < SLOW_QUERY_MS && group && !group.data.flushed) {
+      absorbQuery(group, span, duration);
+      return;
+    }
+    if (!this.canAdmitSql()) {
+      this.droppedCount += 1;
+      return;
+    }
+    this.spanCount += 1;
+    this.sqlCount += 1;
+    if (!failed && duration < SLOW_QUERY_MS && text) {
+      this.queryGroups.set(key, span);
+    }
+    this.ended.push(span);
+  }
+
+  private canAdmitSql(): boolean {
+    if (this.sqlCount >= MAX_SQL_SPANS || this.spanCount >= MAX_SPANS) return false;
+    const nonSql = this.spanCount - this.sqlCount;
+    const reserve = Math.max(0, RESERVED_NON_SQL - nonSql);
+    return this.spanCount + reserve < MAX_SPANS;
   }
 
   private async flushOnce(opts?: { keepalive?: boolean }): Promise<void> {
@@ -186,7 +273,10 @@ export class NodeTracer {
     const ready = this.ended.filter((span) => span.isEnded() && !span.data.flushed);
     if (ready.length === 0) return;
     const extras = {
-      resource: this.options.resource,
+      resource: {
+        ...this.options.resource,
+        ...(this.options.getResourceExtras?.() ?? {}),
+      },
       environment: this.options.environment,
       release: this.options.release,
       userId: this.options.getUserId(),
@@ -208,4 +298,30 @@ export class NodeTracer {
       }
     }
   }
+}
+
+function spanDurationMs(span: RecordingSpan): number {
+  const end = span.data.endTime ?? span.data.startTime;
+  return Math.max(0, end.getTime() - span.data.startTime.getTime());
+}
+
+function absorbQuery(group: RecordingSpan, execution: RecordingSpan, extraMs: number): void {
+  const own = spanDurationMs(group);
+  const count = Number(group.data.attributes['db.query.count'] ?? '1') || 1;
+  const sum =
+    group.data.attributes['db.query.duration_sum_ms'] != null
+      ? Number(group.data.attributes['db.query.duration_sum_ms'])
+      : own;
+  group.setAttribute('db.query.count', String(count + 1));
+  group.setAttribute('db.query.duration_sum_ms', formatMs(sum + extraMs));
+  if (extraMs > own && execution.data.endTime) {
+    group.data.startTime = execution.data.startTime;
+    group.data.endTime = execution.data.endTime;
+  }
+}
+
+function formatMs(ms: number): string {
+  const rounded = Math.round(ms * 1000) / 1000;
+  if (Math.abs(rounded - Math.round(rounded)) < 0.0005) return String(Math.round(rounded));
+  return String(rounded);
 }

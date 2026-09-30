@@ -8,6 +8,7 @@ import {
   IdentityStore,
   IngestError,
   mergeTags,
+  BreadcrumbBuffer,
   normalizeBreadcrumb,
   normalizeEnvironment,
   normalizeSeverity,
@@ -15,6 +16,7 @@ import {
   Scope,
   ServerpodTransport,
   severityAtLeast,
+  TalariaFlags,
   tombstoneFromError,
   tombstoneIsQuiet,
   writePolicyCache,
@@ -53,9 +55,11 @@ export class TalariaNodeClient {
   private sessionId: string | null = null;
   private identity: IdentityStore | null = null;
   private analyticsFacade: AnalyticsFacade | null = null;
+  private flagsClient: TalariaFlags | null = null;
   private ingestDisabled = false;
+  private enableFlags = false;
   private teardowns: Array<() => void> = [];
-  private breadcrumbs: Breadcrumb[] = [];
+  private breadcrumbs = new BreadcrumbBuffer();
 
   init(raw: TalariaNodeInitOptions): void {
     if (this.options) {
@@ -96,6 +100,8 @@ export class TalariaNodeClient {
     });
     this.sessionId = this.identity.touchSession();
     this.analyticsFacade = this.createAnalyticsFacade();
+    this.flagsClient = this.createFlagsClient();
+    this.enableFlags = false;
     if (raw.userId) this.scope.setUser({ id: raw.userId });
     if (raw.tags) this.scope.setTags(raw.tags);
 
@@ -110,9 +116,11 @@ export class TalariaNodeClient {
     if (document.unchanged) return;
     if (document.active === false) {
       this.ingestDisabled = true;
+      this.enableFlags = false;
       this.eventQueue?.disable();
       this.tracer?.disable();
       this.analyticsFacade?.disable();
+      this.flagsClient?.onPolicyUpdated();
       return;
     }
     const eventsRate = document.events?.sampleRate;
@@ -123,6 +131,7 @@ export class TalariaNodeClient {
     this.options.tracesSampleRate = tracingOn
       ? Math.min(1, Math.max(0, document.tracing?.tracesSampleRate ?? 0))
       : 0;
+    this.enableFlags = Boolean(document.flags?.enabled);
     if (tracingOn && !this.tracer) {
       this.tracer = new NodeTracer({
         transport: this.transport,
@@ -133,6 +142,7 @@ export class TalariaNodeClient {
           'telemetry.sdk.name': SDK_NAME,
           'telemetry.sdk.version': SDK_VERSION,
         },
+        getResourceExtras: () => this.flagsClient?.stampTags() ?? {},
         environment: this.options.environment,
         release: this.options.release,
         getUserId: () => this.scope.getUserId(),
@@ -145,6 +155,11 @@ export class TalariaNodeClient {
     }
     if (document.analytics?.enabled) this.analyticsFacade?.optIn();
     else this.analyticsFacade?.disable();
+    const ttlSeconds = Math.min(
+      3600,
+      Math.max(60, Math.floor(document.ttlSeconds ?? 300)),
+    );
+    this.flagsClient?.onPolicyUpdated({ pollIntervalMs: ttlSeconds * 1000 });
   }
 
   private bootstrapPolicy(): void {
@@ -188,6 +203,7 @@ export class TalariaNodeClient {
 
   setUser(user: UserContext | null): void {
     this.scope.setUser(user);
+    void this.flagsClient?.setContext({ userId: user?.id ?? null });
   }
 
   get analytics(): AnalyticsFacade {
@@ -195,6 +211,13 @@ export class TalariaNodeClient {
       this.analyticsFacade = this.createAnalyticsFacade();
     }
     return this.analyticsFacade;
+  }
+
+  get flags(): TalariaFlags {
+    if (!this.flagsClient) {
+      this.flagsClient = this.createFlagsClient();
+    }
+    return this.flagsClient;
   }
 
   private createAnalyticsFacade(): AnalyticsFacade {
@@ -210,6 +233,7 @@ export class TalariaNodeClient {
       getEnvironment: () => this.options?.environment,
       getRelease: () => this.options?.release,
       getPageContext: () => ({}),
+      getExtraProperties: () => this.flagsClient?.stampTags(),
       mapScreenToPage: false,
       requireIdentityOnTrack: true,
       logLabel: '@newtalaria/node',
@@ -217,9 +241,24 @@ export class TalariaNodeClient {
     });
   }
 
+  private createFlagsClient(): TalariaFlags {
+    if (!this.options || !this.identity) {
+      throw new Error('@newtalaria/node: call Talaria.init() first');
+    }
+    return new TalariaFlags({
+      apiKey: this.options.apiKey,
+      identity: this.identity,
+      storage: createMemoryStorage(),
+      getTransport: () => this.transport,
+      isEnabled: () => this.enableFlags,
+      getUserId: () => this.scope.getUserId(),
+      analytics: this.analyticsFacade,
+      logLabel: '@newtalaria/node',
+    });
+  }
+
   addBreadcrumb(crumb: Partial<Breadcrumb> & { type?: string; message?: string }): void {
-    this.breadcrumbs.push(normalizeBreadcrumb(crumb));
-    if (this.breadcrumbs.length > 50) this.breadcrumbs.splice(0, this.breadcrumbs.length - 50);
+    this.breadcrumbs.add(normalizeBreadcrumb(crumb));
   }
 
   startSpan(name: string, opts?: Parameters<NodeTracer['startSpan']>[1]): Span | null {
@@ -234,8 +273,21 @@ export class TalariaNodeClient {
     return this.tracer?.startTransaction(name, opts) ?? null;
   }
 
+  get recordsQuerySpans(): boolean {
+    return this.tracer?.recordsQuerySpans ?? true;
+  }
+
+  setRecordQuerySpans(record: boolean): void {
+    this.tracer?.setRecordQuerySpans(record);
+  }
+
+  withoutQuerySpans<T>(fn: () => T | Promise<T>): Promise<T> {
+    if (!this.tracer) return Promise.resolve(fn());
+    return this.tracer.withoutQuerySpans(fn);
+  }
+
   resetRequestState(): void {
-    this.breadcrumbs = [];
+    this.breadcrumbs.clear();
     this.tracer?.resetRequestState();
   }
 
@@ -294,6 +346,8 @@ export class TalariaNodeClient {
   }
 
   async close(): Promise<void> {
+    this.flagsClient?.close();
+    this.flagsClient = null;
     await this.flush();
     for (const undo of this.teardowns) undo();
     this.teardowns = [];
@@ -336,7 +390,12 @@ export class TalariaNodeClient {
 
     this.sessionId = this.identity?.touchSession() ?? this.sessionId;
     const userId = args.context?.userId ?? this.scope.getUserId();
-    const tags = mergeTags(this.options.tags, this.scope.getTags(), args.context?.tags);
+    const tags = mergeTags(
+      this.options.tags,
+      this.scope.getTags(),
+      this.flagsClient?.stampTags(),
+      args.context?.tags,
+    );
     const extra = args.context?.extra;
     try {
       await this.eventQueue?.enqueue({
@@ -375,7 +434,7 @@ export class TalariaNodeClient {
           extraJson: extra ? JSON.stringify(extra) : undefined,
           traceId: this.tracer?.getTraceId() ?? undefined,
           spanId: this.tracer?.getSpanId() ?? undefined,
-          breadcrumbs: this.breadcrumbs.length ? this.breadcrumbs : undefined,
+          breadcrumbs: this.breadcrumbs.size ? this.breadcrumbs.snapshot() : undefined,
         });
     } catch (error) {
       console.warn('@newtalaria/node: event ingest failed', error);

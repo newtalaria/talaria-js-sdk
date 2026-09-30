@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+
+## 0.4.2
+
+- A trace stores at most 200 spans. The root records `dropped_span_count` when a span is dropped.
+- Breadcrumbs keep at most 15 query crumbs. The other 35 slots stay available for application crumbs.
+- Add `Talaria.flags` (`boolVariation` / `stringVariation` / `jsonVariation`, `setContext`). Honors `flags.enabled` from `sdk/getConfig` and stamps `flag.<key>` on events, spans, and analytics.
+
 ## 0.4.1
 
 - Package docs point at the marketing guides. Example apps no longer pass removed init options.

@@ -12,7 +12,7 @@ globs:
 
 ## Wire contract
 
-Events: `POST {baseUrl}/events/ingestBatch`. Spans: `POST {baseUrl}/spans/ingestBatch`. Analytics: `POST {baseUrl}/analytics/ingestBatch`. Replay (browser only): `replays/start`, `replays/ingestSegmentBatch`, `replays/finish`. Heatmaps (browser only, analytics consent + `analyticsWrite` scope): `heatmaps/ingestBatch`, `heatmaps/uploadSnapshot`.
+Events: `POST {baseUrl}/events/ingestBatch`. Spans: `POST {baseUrl}/spans/ingestBatch`. Analytics: `POST {baseUrl}/analytics/ingestBatch`. Feature flags: `POST {baseUrl}/flags/evaluate`. Replay (browser only): `replays/start`, `replays/ingestSegmentBatch`, `replays/finish`. Heatmaps (browser only, analytics consent + `analyticsWrite` scope): `heatmaps/ingestBatch`, `heatmaps/uploadSnapshot`.
 
 - Header: `X-API-Key` only
 - Serverpod envelopes with `__className__`

@@ -52,6 +52,7 @@ import {
   normalizeBreadcrumb,
   readPolicyCache,
   Scope,
+  TalariaFlags,
   tombstoneFromError,
   tombstoneIsQuiet,
   writePolicyCache,
@@ -386,6 +387,7 @@ function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
     tracingEnabled: false,
     tracesSampleRate: 0,
     enableAnalytics: false,
+    enableFlags: false,
     heatmaps: false,
   };
 }
@@ -544,6 +546,7 @@ export class TalariaClient {
   private lastAnalyticsPath: string | null = null;
   private identity: IdentityStore | null = null;
   private analyticsFacade: AnalyticsFacade | null = null;
+  private flagsClient: TalariaFlags | null = null;
   private heatmaps: HeatmapRecorder | null = null;
   private eventQueue: EventIngestQueue | null = null;
 
@@ -595,6 +598,7 @@ export class TalariaClient {
     this.lastNavigationPath = null;
     this.lastAnalyticsPath = null;
     this.analyticsFacade = this.createAnalyticsFacade();
+    this.flagsClient = this.createFlagsClient();
     void collectBrowserContext().then((ctx) => {
       if (this.options) this.browserContext = ctx;
     });
@@ -758,6 +762,7 @@ export class TalariaClient {
       ? clamp01(document.tracing?.tracesSampleRate ?? 0)
       : 0;
     this.options.enableAnalytics = Boolean(document.analytics?.enabled);
+    this.options.enableFlags = Boolean(document.flags?.enabled);
     this.options.heatmaps = Boolean(document.heatmaps?.enabled);
     const replay = document.replay;
     this.options.replaysSessionSampleRate = clamp01(replay?.sessionSampleRate ?? 0);
@@ -807,6 +812,11 @@ export class TalariaClient {
     } else if (this.options.publicAnalytics) {
       this.analyticsFacade?.optIn();
     }
+    const ttlSeconds = Math.min(
+      3600,
+      Math.max(60, Math.floor(document.ttlSeconds ?? 300)),
+    );
+    this.flagsClient?.onPolicyUpdated({ pollIntervalMs: ttlSeconds * 1000 });
   }
 
   private stopForInactivePolicy(): void {
@@ -814,6 +824,7 @@ export class TalariaClient {
     this.options.tracingEnabled = false;
     this.options.tracesSampleRate = 0;
     this.options.enableAnalytics = false;
+    this.options.enableFlags = false;
     this.options.heatmaps = false;
     this.options.replaysSessionSampleRate = 0;
     this.ingestDisabled = true;
@@ -823,6 +834,7 @@ export class TalariaClient {
     this.tracer?.disable();
     this.analyticsFacade?.disable();
     this.heatmaps?.disable();
+    this.flagsClient?.onPolicyUpdated();
   }
 
   private bootstrapPolicy(): void {
@@ -886,6 +898,9 @@ export class TalariaClient {
 
   setUser(user: UserContext | null): void {
     this.scope.setUser(user);
+    void this.flagsClient?.setContext({
+      userId: user?.id ?? null,
+    });
   }
 
   getUserId(): string | undefined {
@@ -903,6 +918,13 @@ export class TalariaClient {
     return this.analyticsFacade;
   }
 
+  get flags(): TalariaFlags {
+    if (!this.flagsClient) {
+      this.flagsClient = this.createFlagsClient();
+    }
+    return this.flagsClient;
+  }
+
   private createAnalyticsFacade(): AnalyticsFacade {
     return new AnalyticsFacade({
       getTransport: () => this.transport,
@@ -917,12 +939,30 @@ export class TalariaClient {
       getRelease: () => this.options?.release,
       getPageContext: () => this.pageContext(),
       getRuntimeContext: () => this.analyticsRuntimeContext(),
+      getExtraProperties: () => this.flagsClient?.stampTags(),
       mapScreenToPage: true,
       logLabel: '@newtalaria/browser',
       onPermanentError: (error) => {
         this.disableIngestAfterPermanentError(error, 'analytics');
       },
       onOptIn: () => this.captureAutoPageview(),
+    });
+  }
+
+  private createFlagsClient(): TalariaFlags {
+    if (!this.options || !this.identity) {
+      throw new Error('@newtalaria/browser: call Talaria.init() first');
+    }
+    const storage = createWebStorage();
+    return new TalariaFlags({
+      apiKey: this.options.apiKey,
+      identity: this.identity,
+      storage,
+      getTransport: () => this.transport,
+      isEnabled: () => Boolean(this.options?.enableFlags),
+      getUserId: () => this.getUserId(),
+      analytics: this.analyticsFacade,
+      logLabel: '@newtalaria/browser',
     });
   }
 
@@ -1379,6 +1419,8 @@ export class TalariaClient {
 
     this.recorder?.stop();
     this.recorder = null;
+    this.flagsClient?.close();
+    this.flagsClient = null;
     const heatmaps = this.heatmaps;
     this.heatmaps = null;
     heatmaps?.stop();
@@ -1512,6 +1554,7 @@ export class TalariaClient {
     let appTags = mergeTags(
       this.browserContext ? browserContextTags(this.browserContext) : {},
       this.options.tags,
+      this.flagsClient?.stampTags(),
       args.context?.tags,
     );
 
@@ -2084,6 +2127,7 @@ export class TalariaClient {
       transport: this.transport,
       sampleRate: this.options.tracesSampleRate,
       resource,
+      getResourceExtras: () => this.flagsClient?.stampTags() ?? {},
       environment: this.options.environment,
       release: this.options.release,
       userId: this.getUserId(),

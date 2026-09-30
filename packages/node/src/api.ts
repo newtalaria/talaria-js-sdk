@@ -26,6 +26,8 @@ export const Talaria = {
   startSpan: client.startSpan.bind(client),
   startInactiveSpan: client.startInactiveSpan.bind(client),
   startTransaction: client.startTransaction.bind(client),
+  setRecordQuerySpans: client.setRecordQuerySpans.bind(client),
+  withoutQuerySpans: client.withoutQuerySpans.bind(client),
   resetRequestState(): void {
     client.resetRequestState();
   },
@@ -37,6 +39,9 @@ export const Talaria = {
   },
   get analytics() {
     return client.analytics;
+  },
+  get flags() {
+    return client.flags;
   },
   flush(): Promise<void> {
     return client.flush();
@@ -60,6 +65,9 @@ export {
   parseTraceparent,
   formatTraceparent,
   isTracingEnabled,
+  TalariaFlags,
+  evaluateFlags,
+  FEATURE_FLAG_CALLED,
 } from '@newtalaria/core';
 export type {
   Breadcrumb,
@@ -70,6 +78,8 @@ export type {
   AnalyticsCallOptions,
   AnalyticsEventKind,
   IngestAnalyticsEventParams,
+  FlagEvaluationResult,
+  EvaluateFlagsInput,
 } from '@newtalaria/core';
 
 export default Talaria;

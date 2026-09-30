@@ -20,6 +20,7 @@ const canonical = {
   tracing: { enabled: true, tracesSampleRate: 0.1 },
   analytics: { enabled: true },
   heatmaps: { enabled: true },
+  flags: { enabled: false },
   replay: {
     enabled: true,
     sessionSampleRate: 0.1,

@@ -14,6 +14,7 @@ export function policyDocument(
     tracing: { enabled: true, tracesSampleRate: 1 },
     analytics: { enabled: false },
     heatmaps: { enabled: false },
+    flags: { enabled: false },
     replay: {
       enabled: false,
       sessionSampleRate: 0,

@@ -21,6 +21,7 @@ export interface SdkConfigDocument {
   tracing?: { enabled?: boolean; tracesSampleRate?: number };
   analytics?: { enabled?: boolean };
   heatmaps?: { enabled?: boolean };
+  flags?: { enabled?: boolean };
   replay?: {
     enabled?: boolean;
     sessionSampleRate?: number;

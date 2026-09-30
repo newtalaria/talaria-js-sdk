@@ -10,7 +10,8 @@ const client = new TalariaClient();
 
 /**
  * Talaria browser SDK — error capture, logging, session replay, tracing,
- * and opt-in product analytics (`Talaria.analytics`).
+ * opt-in product analytics (`Talaria.analytics`), and feature flags
+ * (`Talaria.flags`).
  *
  * ```ts
  * import { Talaria } from '@newtalaria/browser';
@@ -166,6 +167,10 @@ export const Talaria = {
   get analytics() {
     return client.analytics;
   },
+
+  get flags() {
+    return client.flags;
+  },
 };
 
 export { TalariaClient } from './client.js';
@@ -173,11 +178,17 @@ export type { ScopedTalaria, TalariaLogger } from './client.js';
 export {
   AnalyticsFacade,
   ingestAnalyticsEventBatch,
+  TalariaFlags,
+  evaluateFlags,
+  FEATURE_FLAG_CALLED,
 } from '@newtalaria/core';
 export type {
   AnalyticsCallOptions,
   AnalyticsEventKind,
   IngestAnalyticsEventParams,
+  FlagEvaluationResult,
+  EvaluateFlagsInput,
+  FlagsClientOptions,
 } from '@newtalaria/core';
 export {
   mergeTags,

@@ -32,6 +32,8 @@ export interface TracerOptions {
   transport: ServerpodTransport;
   sampleRate: number;
   resource: Record<string, string>;
+  /** Merged into `resource` at flush (e.g. flag stamps). */
+  getResourceExtras?: () => Record<string, string>;
   environment: string;
   release?: string;
   userId?: string;
@@ -53,6 +55,7 @@ export class Tracer {
   private sampled = false;
   private hasError = false;
   private spanCount = 0;
+  private droppedCount = 0;
   private pageload: RecordingSpan | null = null;
   private lastActivity: Date | null = null;
   private readonly ended: RecordingSpan[] = [];
@@ -129,6 +132,7 @@ export class Tracer {
     this.sampled = headSample(this.options.sampleRate);
     this.hasError = false;
     this.spanCount = 0;
+    this.droppedCount = 0;
     this.ended.length = 0;
     this.lastActivity = new Date();
 
@@ -191,6 +195,7 @@ export class Tracer {
     this.sampled = headSample(this.options.sampleRate);
     this.hasError = false;
     this.spanCount = 0;
+    this.droppedCount = 0;
     this.ended.length = 0;
     this.lastActivity = new Date();
 
@@ -224,7 +229,6 @@ export class Tracer {
     if (this.pageload?.isEnded()) return;
     const parent = getCurrentSpanContext();
     if (!parent) return;
-    if (this.spanCount >= MAX_SPANS_PER_TRANSACTION) return;
 
     const includeQuery = opts?.includeQuery ?? false;
     const parts = {
@@ -292,6 +296,9 @@ export class Tracer {
 
   endPageload(endTime?: Date): void {
     if (!this.pageload || this.pageload.isEnded()) return;
+    if (this.droppedCount > 0) {
+      this.pageload.setAttribute('dropped_span_count', String(this.droppedCount));
+    }
     if (this.pageload.data.status === 'unset' && this.isSampled() && !this.hasError) {
       this.pageload.setStatus('ok');
     }
@@ -316,6 +323,7 @@ export class Tracer {
     this.pageload = null;
     this.ended.length = 0;
     this.spanCount = 0;
+    this.droppedCount = 0;
   }
 
   private createSpan(
@@ -332,6 +340,7 @@ export class Tracer {
       );
     }
     if (this.spanCount >= MAX_SPANS_PER_TRANSACTION) {
+      this.droppedCount += 1;
       return new NoopSpan(
         opts.context ?? {
           traceId: opts.parent?.traceId ?? createTraceId(),
@@ -387,7 +396,10 @@ export class Tracer {
     if (ready.length === 0) return;
 
     const extras = {
-      resource: this.options.resource,
+      resource: {
+        ...this.options.resource,
+        ...(this.options.getResourceExtras?.() ?? {}),
+      },
       environment: this.options.environment,
       release: this.options.release,
       userId: this.options.userId,
