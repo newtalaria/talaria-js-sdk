@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- The browser SDK follows CookieYes, Cookiebot, and Google Consent Mode `analytics_storage`. Analytics, heatmaps, and session replay wait for that choice. Errors still send. Other banners keep using `analytics.optIn()` / `optOut()`.
+
 ## 0.5.0
 
 - **Breaking:** `Talaria.init` no longer accepts `environment`. The API key decides the environment. Events, spans, analytics, replay, and heatmaps omit the `environment` field.

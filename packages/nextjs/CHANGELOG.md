@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- Release aligned with `@newtalaria/browser` 0.5.1. No API changes.
+
 ## 0.5.0
 
 - **Breaking:** Client, server, and edge init no longer accept `environment`. The edge runtime no longer defaults it to production. The API key decides the environment.

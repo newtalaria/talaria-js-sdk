@@ -128,6 +128,8 @@ import {
 } from './tracing/instrument_http.js';
 import { formatTraceparent } from './tracing/traceparent.js';
 import { Tracer } from './tracing/tracer.js';
+import { installConsentAdapters } from './consent/install.js';
+import type { MeasurementSignal } from './consent/types.js';
 
 const PLATFORM_JAVASCRIPT = 'javascript';
 /** End the pageload/navigation root this long after the last child span. */
@@ -498,6 +500,15 @@ export class TalariaClient {
   /** Continuous upload for the whole page session (session sample hit). */
   private sessionSampled = false;
   private uploadEnabled = false;
+  /** Project policy allows replay. Visitor measurement can still hold it. */
+  private replayPolicyEnabled = false;
+  /**
+   * `unknown` means no recognized banner. Replay follows project policy and
+   * analytics waits for `optIn` / `publicAnalytics`.
+   */
+  private measurement: MeasurementSignal | 'unknown' = 'unknown';
+  /** CookieYes / Cookiebot decision. Wins over Consent Mode once it is grant or deny. */
+  private nativeMeasurement: MeasurementSignal | null = null;
   private startedOnServer = false;
   private finishedOnServer = false;
   private segmentIndex = 0;
@@ -734,6 +745,13 @@ export class TalariaClient {
       });
     }
 
+    this.teardowns.push(
+      installConsentAdapters({
+        native: (signal) => this.onNativeMeasurement(signal),
+        consentMode: (signal) => this.onConsentMode(signal),
+      }),
+    );
+
     this.bootstrapPolicy();
   }
 
@@ -781,29 +799,22 @@ export class TalariaClient {
     } else {
       this.tracer.setSampleRate(this.options.tracesSampleRate);
     }
-    if (replay?.enabled && !this.recorder) {
-      this.sessionSampled = Math.random() < this.options.replaysSessionSampleRate;
-      this.uploadEnabled = this.sessionSampled;
-      this.recorder = startRecorder({
-        maskAllInputs: this.options.maskAllInputs,
-        inlineStylesheet: this.options.inlineStylesheet,
-        blockSelector: this.options.blockSelector,
-        checkoutEveryNms: this.sessionSampled ? undefined : RING_BUFFER_CHECKOUT_MS,
-        onEvent: (event) => this.onRrwebEvent(event),
-      });
-      if (this.uploadEnabled) {
-        this.markUploadStarted();
-        void this.enqueueUpload(async () => {
-          await this.ensureStarted({ keepalive: false });
-        });
-      }
+    if (replay?.enabled) {
+      this.replayPolicyEnabled = true;
+      this.replayDisabled = false;
+      this.maybeStartReplay();
     } else if (replay && !replay.enabled) {
+      this.replayPolicyEnabled = false;
       this.uploadEnabled = false;
       this.replayDisabled = true;
     }
     if (!this.options.enableAnalytics) {
       this.analyticsFacade?.disable();
       this.heatmaps?.disable();
+    } else if (this.measurement === 'granted') {
+      this.analyticsFacade?.optIn();
+    } else if (this.measurementBlocksReplay()) {
+      this.analyticsFacade?.optOut();
     } else if (this.options.publicAnalytics) {
       this.analyticsFacade?.optIn();
     }
@@ -881,6 +892,89 @@ export class TalariaClient {
   getReplayId(): string | null {
     if (this.uploadEnabled && this.replayId) return this.replayId;
     return this.linkableReplayId;
+  }
+
+  private onNativeMeasurement(signal: MeasurementSignal): void {
+    if (signal === 'pending') {
+      if (this.measurement !== 'unknown') return;
+      this.nativeMeasurement = 'pending';
+      this.onMeasurement('pending');
+      return;
+    }
+    this.nativeMeasurement = signal;
+    this.onMeasurement(signal);
+  }
+
+  private onConsentMode(signal: MeasurementSignal): void {
+    if (
+      this.nativeMeasurement === 'granted' ||
+      this.nativeMeasurement === 'denied'
+    ) {
+      return;
+    }
+    this.onMeasurement(signal);
+  }
+
+  private onMeasurement(signal: MeasurementSignal): void {
+    this.measurement = signal;
+    this.applyMeasurement();
+  }
+
+  /** Analytics, heatmaps, and replay follow the latest banner signal. */
+  private applyMeasurement(): void {
+    if (!this.options) return;
+    if (this.measurement === 'granted') {
+      if (this.options.enableAnalytics) this.analyticsFacade?.optIn();
+      this.maybeStartReplay();
+      return;
+    }
+    if (this.measurementBlocksReplay()) {
+      this.analyticsFacade?.optOut();
+      this.holdReplay();
+    }
+  }
+
+  private measurementBlocksReplay(): boolean {
+    return this.measurement === 'denied' || this.measurement === 'pending';
+  }
+
+  private maybeStartReplay(): void {
+    if (!this.options || this.replayDisabled || this.recorder) return;
+    if (!this.replayPolicyEnabled || this.measurementBlocksReplay()) return;
+    this.sessionSampled = Math.random() < this.options.replaysSessionSampleRate;
+    this.uploadEnabled = this.sessionSampled;
+    this.recorder = startRecorder({
+      maskAllInputs: this.options.maskAllInputs,
+      inlineStylesheet: this.options.inlineStylesheet,
+      blockSelector: this.options.blockSelector,
+      checkoutEveryNms: this.sessionSampled ? undefined : RING_BUFFER_CHECKOUT_MS,
+      onEvent: (event) => this.onRrwebEvent(event),
+    });
+    if (this.uploadEnabled) {
+      this.markUploadStarted();
+      void this.enqueueUpload(async () => {
+        if (!this.uploadEnabled || this.closed) return;
+        await this.ensureStarted({ keepalive: false });
+      });
+    }
+  }
+
+  /** Stop recording and drop segments that were not sent. */
+  private holdReplay(): void {
+    this.uploadEnabled = false;
+    this.sessionSampled = false;
+    this.clearErrorClipTimer();
+    this.clearMaxDurationTimer();
+    this.recorder?.stop();
+    this.recorder = null;
+    this.buffer.clear();
+    this.startedOnServer = false;
+    this.finishedOnServer = false;
+    this.segmentIndex = 0;
+    this.uploadedCompressedBytes = 0;
+    this.uploadStartedAtMs = null;
+    this.errorClipDeadlineMs = null;
+    this.replayId = createId();
   }
 
   getTraceId(): string | null {
@@ -1458,6 +1552,9 @@ export class TalariaClient {
     this.sessionId = null;
     this.sessionSampled = false;
     this.uploadEnabled = false;
+    this.replayPolicyEnabled = false;
+    this.measurement = 'unknown';
+    this.nativeMeasurement = null;
     this.startedOnServer = false;
     this.finishedOnServer = false;
     this.segmentIndex = 0;
@@ -1599,7 +1696,11 @@ export class TalariaClient {
     let errorClipOutcome: ReplayCaptureOutcome | null = null;
     let attemptedErrorClip = false;
 
-    if (isErrorLike && !this.sessionSampled) {
+    if (
+      isErrorLike &&
+      !this.sessionSampled &&
+      !this.measurementBlocksReplay()
+    ) {
       if (!this.uploadEnabled) {
         if (Math.random() < this.options.replaysOnErrorSampleRate) {
           attemptedErrorClip = true;

@@ -1,6 +1,6 @@
 {
   "name": "@newtalaria/node",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Talaria SDK for Node.js — process errors, incoming/outgoing HTTP, optional APM",
   "type": "module",
   "main": "./dist/index.js",
@@ -29,7 +29,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@newtalaria/core": "^0.5.0"
+    "@newtalaria/core": "^0.5.1"
   },
   "peerDependencies": {
     "ioredis": ">=5",
