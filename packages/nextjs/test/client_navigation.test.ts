@@ -67,7 +67,6 @@ describe('initClient navigation listeners', () => {
       initClient({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'development',
       });
 
       assert.equal(env.popstate.length, 1);

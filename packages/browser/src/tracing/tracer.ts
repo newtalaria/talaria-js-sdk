@@ -34,7 +34,6 @@ export interface TracerOptions {
   resource: Record<string, string>;
   /** Merged into `resource` at flush (e.g. flag stamps). */
   getResourceExtras?: () => Record<string, string>;
-  environment: string;
   release?: string;
   userId?: string;
   getSessionId: () => string | null;
@@ -400,7 +399,6 @@ export class Tracer {
         ...this.options.resource,
         ...(this.options.getResourceExtras?.() ?? {}),
       },
-      environment: this.options.environment,
       release: this.options.release,
       userId: this.options.userId,
       anonymousId: this.options.getAnonymousId() ?? undefined,

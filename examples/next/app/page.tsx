@@ -6,8 +6,6 @@ import { boomAction } from './actions';
 const dsn =
   process.env.NEXT_PUBLIC_TALARIA_DSN ?? 'https://ingest.newtalaria.com';
 const apiKey = process.env.NEXT_PUBLIC_TALARIA_API_KEY ?? '';
-const environment =
-  process.env.NEXT_PUBLIC_TALARIA_ENVIRONMENT ?? 'development';
 const ready = Boolean(apiKey);
 
 export default function Page() {
@@ -29,7 +27,7 @@ export default function Page() {
       >
         {ready ? (
           <>
-            Sending to <code>{dsn}</code> as <code>{environment}</code>.
+            Sending to <code>{dsn}</code>.
           </>
         ) : (
           <>

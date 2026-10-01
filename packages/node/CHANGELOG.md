@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
+- **Breaking:** `Talaria.init` no longer accepts `environment`. The API key decides the environment. Events, spans, and analytics omit the `environment` field.
 
 ## 0.4.2
 

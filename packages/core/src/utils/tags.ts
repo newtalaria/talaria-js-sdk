@@ -103,12 +103,12 @@ export function looksHighCardinalityValue(value: string): boolean {
 }
 
 /**
- * Warn in non-production when tags look high-cardinality.
- * No-op when `environment` is production or warnings are disabled.
+ * Warn when tags look high-cardinality.
+ * No-op when `environment` is omitted or production, or when warnings are disabled.
  */
 export function warnSuspiciousTags(
   tags: TagMap,
-  environment: string | undefined,
+  environment?: string,
   sdkName = '@newtalaria/core',
 ): void {
   if (!environment || environment === 'production') return;

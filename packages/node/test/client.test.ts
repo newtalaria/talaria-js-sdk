@@ -21,7 +21,6 @@ describe('TalariaNodeClient', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'development',
         disableDefaultIntegrations: true,
       });
       client.setUser({ id: 'n-1' });

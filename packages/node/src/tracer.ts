@@ -24,7 +24,6 @@ export interface NodeTracerOptions {
   resource: Record<string, string>;
   /** Merged into `resource` at flush (e.g. flag stamps). */
   getResourceExtras?: () => Record<string, string>;
-  environment: string;
   release?: string;
   getUserId: () => string | undefined;
   getSessionId: () => string | null;
@@ -277,7 +276,6 @@ export class NodeTracer {
         ...this.options.resource,
         ...(this.options.getResourceExtras?.() ?? {}),
       },
-      environment: this.options.environment,
       release: this.options.release,
       userId: this.options.getUserId(),
       anonymousId: this.options.getAnonymousId() ?? undefined,

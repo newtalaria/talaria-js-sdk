@@ -16,13 +16,12 @@ import { Talaria } from '@newtalaria/browser';
 Talaria.init({
   dsn: 'https://ingest.newtalaria.com',
   apiKey: 'tal_live_…',
-  environment: 'production',
   release: '1.4.2',
   minLevel: 'warning',
 });
 ```
 
-Tracing, analytics, heatmaps, and session replay follow Project settings.
+The API key decides the environment. Tracing, analytics, heatmaps, and session replay follow Project settings.
 
 ## License
 

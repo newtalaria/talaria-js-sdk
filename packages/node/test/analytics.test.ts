@@ -19,7 +19,6 @@ describe('TalariaNodeClient analytics', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'development',
         disableDefaultIntegrations: true,
       });
       client.analytics.track('server_event');
@@ -56,7 +55,6 @@ describe('TalariaNodeClient analytics', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'development',
         remoteConfig: false,
         disableDefaultIntegrations: true,
         anonymousId: 'node-anon',

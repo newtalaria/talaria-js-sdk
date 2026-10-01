@@ -6,7 +6,6 @@ export type {
   CoreInitOptions,
   DebugImage,
   DebugMeta,
-  Environment,
   ExceptionData,
   ExceptionMechanism,
   ExceptionValue,
@@ -169,7 +168,6 @@ export {
 } from './policy/sdk_policy.js';
 
 export { createId } from './utils/id.js';
-export { normalizeEnvironment } from './utils/environment.js';
 export {
   maxSeverity,
   normalizeSeverity,

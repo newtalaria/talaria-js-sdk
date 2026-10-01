@@ -53,7 +53,6 @@ export interface AnalyticsBindings {
   getTraceId: () => string | null;
   getSpanId: () => string | null;
   getPlatform: () => string;
-  getEnvironment: () => string | undefined;
   getRelease: () => string | undefined;
   /** Raw page URL / referrer (UTM parsed before sanitizing the wire fields). */
   getPageContext: () => AnalyticsPageContext;
@@ -259,7 +258,6 @@ export class AnalyticsFacade {
       traceId: this.bindings.getTraceId() ?? undefined,
       spanId: this.bindings.getSpanId() ?? undefined,
       platform: this.bindings.getPlatform(),
-      environment: this.bindings.getEnvironment(),
       release: this.bindings.getRelease(),
       url: ctx.url ? sanitizeTelemetryUrl(ctx.url) : undefined,
       path: ctx.path,

@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 
+- **Breaking:** `init` no longer accepts `environment`. The API key decides the environment. Events, spans, and analytics omit the `environment` field. `normalizeEnvironment` and the `Environment` type are removed.
 
 ## 0.4.2
 

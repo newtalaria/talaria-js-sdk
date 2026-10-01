@@ -5,7 +5,6 @@ export type {
   CaptureContext,
   DebugImage,
   DebugMeta,
-  Environment,
   ExceptionData,
   ExceptionMechanism,
   ExceptionValue,
@@ -20,7 +19,6 @@ export type {
 import type {
   BeforeSendEvent,
   BeforeSendHint,
-  Environment,
   LoggerPreset,
   SeverityLevel,
 } from '@newtalaria/core';
@@ -38,7 +36,6 @@ export interface TalariaInitOptions {
   baseUrl?: string;
   /** Project API key (`tal_live_…`). */
   apiKey: string;
-  environment: Environment | string;
   release?: string;
   /**
    * Git commit SHA for the deployed build (full or abbreviated).
@@ -172,8 +169,6 @@ export interface TalariaInitOptions {
 export interface ResolvedOptions {
   baseUrl: string;
   apiKey: string;
-  /** Wire enum value after alias normalization (`test` → `staging`, etc.). */
-  environment: Environment;
   release?: string;
   commitSha?: string;
   minLevel: SeverityLevel;

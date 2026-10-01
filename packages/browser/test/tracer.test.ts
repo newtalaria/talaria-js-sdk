@@ -12,7 +12,6 @@ function makeTracer(): Tracer {
     }),
     sampleRate: 1,
     resource: { 'service.name': 'test' },
-    environment: 'test',
     getSessionId: () => 'session',
     getReplayId: () => null,
   });

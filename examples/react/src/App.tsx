@@ -3,7 +3,6 @@ import { ErrorBoundary, Profiler, Talaria } from '@newtalaria/react';
 
 const dsn = import.meta.env.VITE_TALARIA_DSN || 'https://api.newtalaria.com';
 const apiKey = import.meta.env.VITE_TALARIA_API_KEY || '';
-const environment = import.meta.env.VITE_TALARIA_ENVIRONMENT || 'development';
 
 export function App() {
   const ready = Boolean(apiKey);
@@ -18,7 +17,7 @@ export function App() {
       <p className={`status${ready ? '' : ' warn'}`}>
         {ready ? (
           <>
-            Sending to <code>{dsn}</code> as <code>{environment}</code>.
+            Sending to <code>{dsn}</code>.
           </>
         ) : (
           <>

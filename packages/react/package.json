@@ -1,6 +1,6 @@
 {
   "name": "@newtalaria/react",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Talaria SDK for React — ErrorBoundary, Profiler, and optional React Router instrumentation",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,7 +24,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@newtalaria/browser": "^0.4.2"
+    "@newtalaria/browser": "^0.5.0"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",

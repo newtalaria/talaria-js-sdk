@@ -15,7 +15,6 @@ import { Talaria, ErrorBoundary, reactErrorHandler } from '@newtalaria/react';
 Talaria.init({
   dsn: 'https://ingest.newtalaria.com',
   apiKey: 'tal_live_…',
-  environment: 'production',
 });
 
 const root = createRoot(document.getElementById('root')!, {
@@ -28,5 +27,7 @@ root.render(
   </ErrorBoundary>,
 );
 ```
+
+The API key decides the environment.
 
 Building Next.js? Install [`@newtalaria/nextjs`](https://www.npmjs.com/package/@newtalaria/nextjs) instead.

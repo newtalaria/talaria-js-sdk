@@ -55,7 +55,6 @@ function initClient(
   client.init({
     dsn: 'http://localhost:8080',
     apiKey: 'tal_live_test',
-    environment: 'development',
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
     disableDefaultIntegrations: true,

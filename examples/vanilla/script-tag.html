@@ -28,17 +28,12 @@
         'https://ingest.newtalaria.com';
       const apiKey =
         params.get('apiKey') || localStorage.getItem('TALARIA_API_KEY') || '';
-      const environment =
-        params.get('environment') ||
-        localStorage.getItem('TALARIA_ENVIRONMENT') ||
-        'development';
       const status = document.getElementById('status');
       const ready = Boolean(window.Talaria && apiKey);
       if (ready) {
         Talaria.init({
           dsn: dsn,
           apiKey: apiKey,
-          environment: environment,
           remoteConfig: true,
           replaysOnErrorSampleRate: 1,
         });

@@ -15,7 +15,6 @@ import { Talaria, handleHttpRequest } from '@newtalaria/node';
 Talaria.init({
   dsn: 'https://ingest.newtalaria.com',
   apiKey: process.env.TALARIA_API_KEY!,
-  environment: process.env.TALARIA_ENVIRONMENT ?? 'production',
   remoteConfig: true,
 });
 
@@ -25,6 +24,6 @@ http.createServer((req, res) => {
 }).listen(3000);
 ```
 
-Long-lived workers should call `Talaria.resetRequestState()` between jobs.
+The API key decides the environment. Long-lived workers should call `Talaria.resetRequestState()` between jobs.
 
 Building Next.js? Install [`@newtalaria/nextjs`](https://www.npmjs.com/package/@newtalaria/nextjs) instead.

@@ -135,7 +135,6 @@ export function toIngestSpan(
   span: MutableSpan,
   extras: {
     resource: Record<string, string>;
-    environment?: string;
     release?: string;
     userId?: string;
     anonymousId?: string;
@@ -156,7 +155,6 @@ export function toIngestSpan(
     attributes: { ...span.attributes },
     resource: { ...extras.resource },
     events: span.events.map((event) => ({ ...event })),
-    environment: extras.environment,
     release: extras.release,
     userId: extras.userId,
     anonymousId: extras.anonymousId,

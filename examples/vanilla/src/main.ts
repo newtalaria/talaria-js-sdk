@@ -3,14 +3,12 @@ import './style.css';
 
 const dsn = import.meta.env.VITE_TALARIA_DSN || 'https://ingest.newtalaria.com';
 const apiKey = import.meta.env.VITE_TALARIA_API_KEY || '';
-const environment = import.meta.env.VITE_TALARIA_ENVIRONMENT || 'development';
 const ready = Boolean(apiKey);
 
 if (ready) {
   Talaria.init({
     dsn,
     apiKey,
-    environment,
     remoteConfig: true,
   });
   Talaria.setUser({ id: 'demo-user' });
@@ -27,7 +25,7 @@ app.innerHTML = `
     <p class="status ${ready ? '' : 'warn'}">
       ${
         ready
-          ? `Sending to <code>${dsn}</code> as <code>${environment}</code>.`
+          ? `Sending to <code>${dsn}</code>.`
           : 'Copy <code>.env.example</code> to <code>.env</code> and set <code>VITE_TALARIA_API_KEY</code>.'
       }
     </p>

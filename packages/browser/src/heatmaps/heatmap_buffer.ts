@@ -16,7 +16,6 @@ export interface HeatmapPageViewContext {
   url: string;
   path?: string;
   startedAt: Date;
-  environment?: string;
   release?: string;
   browserName?: string;
   browserVersion?: string;
@@ -149,7 +148,6 @@ function toParams(pv: OpenPageView, now: Date): HeatmapPageViewParams | null {
     documentHeight: scroll.documentHeight,
     maxScrollDepthPx: scroll.maxScrollDepthPx,
     initialFoldPx: scroll.initialFoldPx,
-    environment: c.environment,
     release: c.release,
     browserName: c.browserName,
     browserVersion: c.browserVersion,

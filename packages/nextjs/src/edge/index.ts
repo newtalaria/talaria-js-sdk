@@ -1,7 +1,6 @@
 import {
   ingestEventBatch,
   ServerpodTransport,
-  normalizeEnvironment,
   type CaptureContext,
   type CoreInitOptions,
 } from '@newtalaria/core';
@@ -9,14 +8,12 @@ import {
 const PLATFORM = 'javascript';
 
 let transport: ServerpodTransport | null = null;
-let environment: 'production' | 'staging' | 'development' = 'production';
 let release: string | undefined;
 
 export function initEdge(options: CoreInitOptions): void {
   const baseUrl = (options.dsn || options.baseUrl || '').replace(/\/+$/, '');
   if (!baseUrl) throw new Error('@newtalaria/nextjs/edge: init requires dsn or baseUrl');
   transport = new ServerpodTransport({ baseUrl, apiKey: options.apiKey });
-  environment = normalizeEnvironment(String(options.environment));
   release = options.release;
 }
 
@@ -30,7 +27,6 @@ export async function captureException(
     await ingestEventBatch(transport, [
       {
         message: err.message || String(error),
-        environment,
         level: 'error',
         eventType: 'error',
         title: err.name,

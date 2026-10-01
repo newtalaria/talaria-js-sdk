@@ -8,7 +8,7 @@ import {
 import type { IngestEventParams } from '../src/transport/events.ts';
 
 function event(message: string): IngestEventParams {
-  return { message, environment: 'production' };
+  return { message };
 }
 
 describe('EventIngestQueue', () => {

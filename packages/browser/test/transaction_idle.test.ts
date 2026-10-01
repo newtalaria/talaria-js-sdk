@@ -62,7 +62,6 @@ function initTracedClient(): TalariaClient {
   client.init({
     dsn: 'http://localhost:8080',
     apiKey: 'tal_live_test',
-    environment: 'development',
     remoteConfig: false,
     disableDefaultIntegrations: true,
   });

@@ -11,7 +11,6 @@ function tracer(): NodeTracer {
     }),
     sampleRate: 1,
     resource: { 'service.name': 'test' },
-    environment: 'test',
     getUserId: () => undefined,
     getSessionId: () => null,
     getAnonymousId: () => null,

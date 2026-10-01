@@ -10,7 +10,6 @@ import {
   mergeTags,
   BreadcrumbBuffer,
   normalizeBreadcrumb,
-  normalizeEnvironment,
   normalizeSeverity,
   readPolicyCache,
   Scope,
@@ -40,7 +39,6 @@ const PLATFORM = 'node';
 export class TalariaNodeClient {
   private options: (TalariaNodeInitOptions & {
     baseUrl: string;
-    environment: 'production' | 'staging' | 'development';
     minLevel: SeverityLevel;
     tracingEnabled: boolean;
     tracesSampleRate: number;
@@ -68,11 +66,9 @@ export class TalariaNodeClient {
     }
     const baseUrl = (raw.dsn || raw.baseUrl || '').replace(/\/+$/, '');
     if (!baseUrl) throw new Error('@newtalaria/node: init requires dsn or baseUrl');
-    const environment = normalizeEnvironment(String(raw.environment));
     this.options = {
       ...raw,
       baseUrl,
-      environment,
       minLevel: raw.minLevel ?? 'debug',
       tracingEnabled: false,
       tracesSampleRate: 0,
@@ -138,12 +134,10 @@ export class TalariaNodeClient {
         sampleRate: this.options.tracesSampleRate,
         resource: {
           'service.name': this.options.serviceName || 'node',
-          'deployment.environment': this.options.environment,
           'telemetry.sdk.name': SDK_NAME,
           'telemetry.sdk.version': SDK_VERSION,
         },
         getResourceExtras: () => this.flagsClient?.stampTags() ?? {},
-        environment: this.options.environment,
         release: this.options.release,
         getUserId: () => this.scope.getUserId(),
         getSessionId: () => this.sessionId,
@@ -230,7 +224,6 @@ export class TalariaNodeClient {
       getTraceId: () => this.getTraceId(),
       getSpanId: () => this.getSpanId(),
       getPlatform: () => PLATFORM,
-      getEnvironment: () => this.options?.environment,
       getRelease: () => this.options?.release,
       getPageContext: () => ({}),
       getExtraProperties: () => this.flagsClient?.stampTags(),
@@ -400,7 +393,6 @@ export class TalariaNodeClient {
     try {
       await this.eventQueue?.enqueue({
           message: args.message,
-          environment: this.options.environment,
           level,
           eventType:
             level === 'fatal' || level === 'error'

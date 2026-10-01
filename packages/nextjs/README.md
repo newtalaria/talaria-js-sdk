@@ -8,6 +8,8 @@ Docs: [Next.js SDK](https://www.newtalaria.com/docs/sdk/nextjs)
 npm install @newtalaria/nextjs
 ```
 
+The API key decides the environment.
+
 Use **disjoint entrypoints** so the App Router never bundles Node `http` into the client:
 
 ```ts
@@ -17,7 +19,6 @@ import { initClient } from '@newtalaria/nextjs/client';
 initClient({
   dsn: 'https://ingest.newtalaria.com',
   apiKey: process.env.NEXT_PUBLIC_TALARIA_API_KEY!,
-  environment: process.env.NEXT_PUBLIC_TALARIA_ENVIRONMENT ?? 'production',
 });
 ```
 
@@ -28,7 +29,6 @@ import { initServer } from '@newtalaria/nextjs/server';
 initServer({
   dsn: 'https://ingest.newtalaria.com',
   apiKey: process.env.TALARIA_API_KEY!,
-  environment: process.env.TALARIA_ENVIRONMENT ?? 'production',
 });
 ```
 

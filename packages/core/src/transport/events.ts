@@ -12,7 +12,6 @@ import type { ServerpodTransport } from './serverpod.js';
 
 export interface IngestEventParams {
   message: string;
-  environment: string;
   level?: SeverityLevel;
   eventType?: 'error' | 'warning' | 'info' | 'debug';
   title?: string;
@@ -42,7 +41,6 @@ function serializeEvent(params: IngestEventParams): Record<string, unknown> {
   const input: Record<string, unknown> = {
     __className__: 'IngestEventInput',
     message: params.message,
-    environment: params.environment,
   };
 
   if (params.level) input.level = params.level;

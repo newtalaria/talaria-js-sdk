@@ -10,7 +10,6 @@ if (apiKey) {
   Talaria.init({
     dsn: import.meta.env.VITE_TALARIA_DSN || 'https://ingest.newtalaria.com',
     apiKey,
-    environment: import.meta.env.VITE_TALARIA_ENVIRONMENT || 'development',
     remoteConfig: true,
   });
   Talaria.setUser({ id: 'demo-user' });

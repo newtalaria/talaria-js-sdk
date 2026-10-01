@@ -322,7 +322,6 @@ describe('feature flags client', () => {
         getTraceId: () => null,
         getSpanId: () => null,
         getPlatform: () => 'javascript',
-        getEnvironment: () => 'development',
         getRelease: () => undefined,
         getPageContext: () => ({}),
         mapScreenToPage: true,

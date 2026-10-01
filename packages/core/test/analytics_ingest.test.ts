@@ -40,7 +40,6 @@ describe('analytics ingest serialization', () => {
           traceId: 'a'.repeat(32),
           spanId: 'b'.repeat(16),
           platform: 'javascript',
-          environment: 'production',
           url: 'https://shop.example.com/p',
           path: '/p',
           title: 'Product',
@@ -73,6 +72,7 @@ describe('analytics ingest serialization', () => {
       assert.equal(events[0]!.device, 'desktop');
       assert.equal(events[0]!.timezone, 'Pacific/Auckland');
       assert.equal(events[0]!.userAgent, undefined);
+      assert.equal(events[0]!.environment, undefined);
       assert.equal(
         events[0]!.propertiesJson,
         JSON.stringify({ product_id: '123', price: 129.99 }),
@@ -147,7 +147,6 @@ describe('AnalyticsFacade consent', () => {
         getTraceId: () => null,
         getSpanId: () => null,
         getPlatform: () => 'javascript',
-        getEnvironment: () => 'development',
         getRelease: () => undefined,
         getPageContext: () => ({}),
         mapScreenToPage: true,

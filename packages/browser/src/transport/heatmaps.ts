@@ -39,7 +39,6 @@ export interface HeatmapPageViewParams {
   documentHeight: number;
   maxScrollDepthPx: number;
   initialFoldPx: number;
-  environment?: string;
   release?: string;
   browserName?: string;
   browserVersion?: string;
@@ -97,7 +96,6 @@ export function serializeHeatmapPageView(
   if (p.userId) out.userId = p.userId;
   if (p.replayId) out.replayId = p.replayId;
   if (p.path) out.path = p.path;
-  if (p.environment) out.environment = p.environment;
   if (p.release) out.release = p.release;
   if (p.browserName) out.browserName = p.browserName;
   if (p.browserVersion) out.browserVersion = p.browserVersion;

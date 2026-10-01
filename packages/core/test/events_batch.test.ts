@@ -24,7 +24,6 @@ describe('event batch ingest', () => {
       });
       await ingestEvent(transport, {
         message: 'hello',
-        environment: 'development',
         level: 'error',
         anonymousId: 'anon-evt',
       });
@@ -36,6 +35,7 @@ describe('event batch ingest', () => {
       assert.equal(events[0]!.__className__, 'IngestEventInput');
       assert.equal(events[0]!.message, 'hello');
       assert.equal(events[0]!.anonymousId, 'anon-evt');
+      assert.equal(events[0]!.environment, undefined);
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -58,8 +58,8 @@ describe('event batch ingest', () => {
         apiKey: 'tal_live_test',
       });
       await ingestEventBatch(transport, [
-        { message: 'a', environment: 'production' },
-        { message: 'b', environment: 'production' },
+        { message: 'a' },
+        { message: 'b' },
       ]);
       const input = body!.input as Record<string, unknown>;
       const events = input.events as Array<Record<string, unknown>>;

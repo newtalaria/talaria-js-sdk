@@ -297,7 +297,6 @@ describe('lifecycle', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -306,7 +305,6 @@ describe('lifecycle', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -336,7 +334,6 @@ describe('event ↔ replay link after finish', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 1,
         replaysErrorAfterMs: 15_000,
@@ -411,7 +408,6 @@ describe('permanent ingest circuit breaker', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'development',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -465,7 +461,6 @@ describe('permanent ingest circuit breaker', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'development',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -503,7 +498,6 @@ describe('permanent ingest circuit breaker', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'development',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -617,7 +611,6 @@ describe('replay segment batch + breadcrumbs', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'test',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });
@@ -658,7 +651,6 @@ describe('replay segment batch + breadcrumbs', () => {
       client.init({
         dsn: 'http://localhost:8080',
         apiKey: 'tal_live_test',
-        environment: 'test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 1,
         disableDefaultIntegrations: true,

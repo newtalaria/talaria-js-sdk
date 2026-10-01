@@ -25,7 +25,6 @@ export interface IngestAnalyticsEventParams {
   spanId?: string;
   requestId?: string;
   platform?: string;
-  environment?: string;
   release?: string;
   url?: string;
   path?: string;
@@ -72,7 +71,6 @@ export function serializeAnalyticsEvent(
   if (params.spanId) out.spanId = params.spanId;
   if (params.requestId) out.requestId = params.requestId;
   if (params.platform) out.platform = params.platform;
-  if (params.environment) out.environment = params.environment;
   if (params.release) out.release = params.release;
   if (params.url) out.url = params.url;
   if (params.path) out.path = params.path;

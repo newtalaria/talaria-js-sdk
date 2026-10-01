@@ -4,7 +4,6 @@ import { MAX_COMPRESSED_SEGMENT_BYTES } from '../replay/segment_buffer.js';
 
 export interface StartReplayParams {
   replayId: string;
-  environment: string;
   sessionId?: string;
   anonymousId?: string;
   url?: string;
@@ -44,7 +43,6 @@ export async function startReplay(
   const input: Record<string, unknown> = {
     __className__: 'StartReplayInput',
     replayId: params.replayId,
-    environment: params.environment,
   };
   if (params.sessionId) input.sessionId = params.sessionId;
   if (params.anonymousId) input.anonymousId = params.anonymousId;

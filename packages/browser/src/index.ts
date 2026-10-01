@@ -19,7 +19,6 @@ const client = new TalariaClient();
  * Talaria.init({
  *   dsn: 'https://ingest.newtalaria.com',
  *   apiKey: 'tal_live_…',
- *   environment: 'production',
  *   minLevel: 'warning',
  *   replaysOnErrorSampleRate: 1,
  *   replaysErrorAfterMs: 15_000,
@@ -221,7 +220,6 @@ export type {
   CaptureContext,
   DebugImage,
   DebugMeta,
-  Environment,
   ExceptionData,
   ExceptionMechanism,
   ExceptionValue,

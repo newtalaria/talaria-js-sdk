@@ -1,9 +1,6 @@
 /** Severity levels accepted by Talaria event ingest. */
 export type SeverityLevel = 'debug' | 'info' | 'warning' | 'error' | 'fatal';
 
-/** Environments accepted by Talaria wire enums. */
-export type Environment = 'production' | 'staging' | 'development';
-
 /** Mutable event snapshot passed to `beforeSend`. */
 export interface BeforeSendEvent {
   message: string;
@@ -137,7 +134,6 @@ export interface CoreInitOptions {
   dsn?: string;
   baseUrl?: string;
   apiKey: string;
-  environment: Environment | string;
   release?: string;
   commitSha?: string;
   minLevel?: SeverityLevel;

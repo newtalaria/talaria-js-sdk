@@ -28,7 +28,6 @@ export interface IngestSpanParams {
   resource?: Record<string, string>;
   events?: SpanEventInput[];
   links?: SpanLinkInput[];
-  environment?: string;
   release?: string;
   userId?: string;
   anonymousId?: string;
@@ -84,7 +83,6 @@ function serializeSpan(span: IngestSpanParams): Record<string, unknown> {
   if (span.links && span.links.length) {
     out.links = span.links.map(serializeSpanLink);
   }
-  if (span.environment) out.environment = span.environment;
   if (span.release) out.release = span.release;
   if (span.userId) out.userId = span.userId;
   if (span.anonymousId) out.anonymousId = span.anonymousId;

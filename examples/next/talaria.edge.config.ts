@@ -5,6 +5,5 @@ if (apiKey) {
   initEdge({
     dsn: process.env.TALARIA_DSN ?? 'https://ingest.newtalaria.com',
     apiKey,
-    environment: process.env.TALARIA_ENVIRONMENT ?? 'development',
   });
 }

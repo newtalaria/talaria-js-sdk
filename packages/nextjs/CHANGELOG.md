@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- **Breaking:** Client, server, and edge init no longer accept `environment`. The edge runtime no longer defaults it to production. The API key decides the environment.
+
 ## 0.4.2
 
 - Feature flags client parity with Dart (`Talaria.flags`).

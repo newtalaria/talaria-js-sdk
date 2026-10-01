@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- **Breaking:** `Talaria.init` no longer accepts `environment`. The API key decides the environment.
+
 ## 0.4.2
 
 - Feature flags client parity with Dart (`Talaria.flags`).

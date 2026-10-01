@@ -10,7 +10,6 @@ import type {
   TalariaInitOptions,
 } from './types.js';
 import { createId } from './utils/id.js';
-import { normalizeEnvironment } from './utils/environment.js';
 import {
   DEFAULT_IGNORE_ERRORS,
   shouldDropCapturedError,
@@ -31,7 +30,7 @@ import {
   normalizeSeverity,
   severityAtLeast,
 } from './utils/severity.js';
-import { mergeTags, warnSuspiciousTags, type TagMap } from './utils/tags.js';
+import { mergeTags, type TagMap } from './utils/tags.js';
 import {
   applySourceLocation,
   parseStackTrace,
@@ -343,14 +342,10 @@ function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
   if (!options.apiKey?.trim()) {
     throw new Error('@newtalaria/browser: init requires `apiKey`');
   }
-  if (!options.environment) {
-    throw new Error('@newtalaria/browser: init requires `environment`');
-  }
 
   return {
     baseUrl,
     apiKey: options.apiKey.trim(),
-    environment: normalizeEnvironment(String(options.environment)),
     release: options.release,
     commitSha: options.commitSha?.trim() || undefined,
     minLevel:
@@ -935,7 +930,6 @@ export class TalariaClient {
       getTraceId: () => this.getTraceId(),
       getSpanId: () => this.getSpanId(),
       getPlatform: () => PLATFORM_JAVASCRIPT,
-      getEnvironment: () => this.options?.environment,
       getRelease: () => this.options?.release,
       getPageContext: () => this.pageContext(),
       getRuntimeContext: () => this.analyticsRuntimeContext(),
@@ -1078,7 +1072,6 @@ export class TalariaClient {
       userId: this.getUserId(),
       url: ctx.url,
       path: ctx.path,
-      environment: this.options?.environment,
       release: this.options?.release,
       browserName: runtime?.browserName,
       browserVersion: runtime?.browserVersion,
@@ -1683,7 +1676,6 @@ export class TalariaClient {
     const queuedMs = Math.max(0, Date.now() - occurredAt.getTime());
 
     const tags = applyReplayCaptureTags(appTags, errorClipOutcome);
-    warnSuspiciousTags(tags, this.options.environment);
     const scrubbedContextExtra = scrubLegacyExceptionExtra(contextExtra);
     const extra = mergeReplayCaptureExtra(
       {
@@ -1727,7 +1719,6 @@ export class TalariaClient {
     try {
       await this.eventQueue?.enqueue({
         message,
-        environment: this.options.environment,
         level,
         eventType: levelToEventType(level),
         title,
@@ -2115,7 +2106,6 @@ export class TalariaClient {
 
     const resource: Record<string, string> = {
       'service.name': this.options.tags?.service || 'browser',
-      'deployment.environment': this.options.environment,
       'telemetry.sdk.name': SDK_NAME,
       'telemetry.sdk.version': SDK_VERSION,
     };
@@ -2128,7 +2118,6 @@ export class TalariaClient {
       sampleRate: this.options.tracesSampleRate,
       resource,
       getResourceExtras: () => this.flagsClient?.stampTags() ?? {},
-      environment: this.options.environment,
       release: this.options.release,
       userId: this.getUserId(),
       getSessionId: () => this.sessionId,
@@ -2444,7 +2433,6 @@ export class TalariaClient {
     try {
       await startReplay(this.transport, {
         replayId: this.replayId,
-        environment: this.options.environment,
         sessionId: this.sessionId,
         anonymousId: this.identity?.getAnonymousId() ?? undefined,
         url: currentLocation()?.href,
