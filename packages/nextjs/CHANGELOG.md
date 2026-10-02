@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Release aligned with `@newtalaria/browser` 0.5.2. The client still records Web Vitals through `@newtalaria/browser`.
+
 ## 0.5.1
 
 - Release aligned with `@newtalaria/browser` 0.5.1. No API changes.

@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { installWebVitals } from '../src/integrations/web_vitals.ts';
+import {
+  installWebVitals,
+  rateWebVital,
+  vitalFromMetric,
+} from '../src/integrations/web_vitals.ts';
+import type { MetricType } from 'web-vitals';
 
 describe('web vitals observer', () => {
   it('no-ops when PerformanceObserver is missing', () => {
@@ -17,68 +22,50 @@ describe('web vitals observer', () => {
     }
   });
 
-  it('forwards lcp/inp/cls entries from PerformanceObserver', () => {
-    const observers: FakeObserver[] = [];
-
-    class FakeObserver {
-      cb: PerformanceObserverCallback;
-      type: string | null = null;
-      constructor(cb: PerformanceObserverCallback) {
-        this.cb = cb;
-        observers.push(this);
-      }
-      observe(opts: { type: string }): void {
-        this.type = opts.type;
-      }
-      disconnect(): void {}
-      static supportedEntryTypes = [
-        'largest-contentful-paint',
-        'event',
-        'layout-shift',
-      ];
-    }
-
-    const original = globalThis.PerformanceObserver;
-    globalThis.PerformanceObserver = FakeObserver as unknown as typeof PerformanceObserver;
-    try {
-      const seen: Array<{ name: string; value: number }> = [];
-      const stop = installWebVitals((v) =>
-        seen.push({ name: v.name, value: v.value }),
-      );
-
-      const lcp = observers.find((o) => o.type === 'largest-contentful-paint');
-      const inp = observers.find((o) => o.type === 'event');
-      const cls = observers.find((o) => o.type === 'layout-shift');
-      assert.ok(lcp && inp && cls);
-
-      lcp!.cb(
-        {
-          getEntries: () => [{ startTime: 1234 } as PerformanceEntry],
-        } as PerformanceObserverEntryList,
-        lcp as unknown as PerformanceObserver,
-      );
-      inp!.cb(
-        {
-          getEntries: () => [{ duration: 80 } as PerformanceEntry],
-        } as PerformanceObserverEntryList,
-        inp as unknown as PerformanceObserver,
-      );
-      cls!.cb(
-        {
-          getEntries: () =>
-            [{ value: 0.05, hadRecentInput: false } as PerformanceEntry],
-        } as PerformanceObserverEntryList,
-        cls as unknown as PerformanceObserver,
-      );
-
-      stop();
-      assert.deepEqual(seen, [
+  it('maps LCP, INP, CLS, and TTFB and drops FCP', () => {
+    const lcp = vitalFromMetric(metric('LCP', 1234, 'good'));
+    const inp = vitalFromMetric(metric('INP', 80, 'good'));
+    const cls = vitalFromMetric(metric('CLS', 0.05, 'good'));
+    const ttfb = vitalFromMetric(metric('TTFB', 400, 'good'));
+    const fcp = vitalFromMetric(metric('FCP', 100, 'good'));
+    assert.equal(fcp, null);
+    assert.deepEqual(
+      [lcp, inp, cls, ttfb].map((vital) => vital && { name: vital.name, value: vital.value }),
+      [
         { name: 'lcp', value: 1234 },
         { name: 'inp', value: 80 },
         { name: 'cls', value: 0.05 },
-      ]);
-    } finally {
-      globalThis.PerformanceObserver = original;
-    }
+        { name: 'ttfb', value: 400 },
+      ],
+    );
+    assert.equal(lcp?.rating, 'good');
+    assert.equal(lcp?.id, 'id-LCP');
+    assert.equal(lcp?.navigationType, 'navigate');
+  });
+
+  it('rates values on Chrome thresholds', () => {
+    assert.equal(rateWebVital('lcp', 2500), 'good');
+    assert.equal(rateWebVital('lcp', 4000), 'needs-improvement');
+    assert.equal(rateWebVital('lcp', 4001), 'poor');
+    assert.equal(rateWebVital('inp', 200), 'good');
+    assert.equal(rateWebVital('cls', 0.25), 'needs-improvement');
+    assert.equal(rateWebVital('ttfb', 1801), 'poor');
   });
 });
+
+function metric(
+  name: MetricType['name'],
+  value: number,
+  rating: 'good' | 'needs-improvement' | 'poor',
+): MetricType {
+  return {
+    name,
+    value,
+    delta: value,
+    id: `id-${name}`,
+    rating,
+    navigationType: 'navigate',
+    entries: [],
+    navigationId: 1,
+  } as MetricType;
+}

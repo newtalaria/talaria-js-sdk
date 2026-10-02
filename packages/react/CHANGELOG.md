@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Depends on `@newtalaria/browser` ^0.5.2, which records Web Vitals.
+
 ## 0.5.1
 
 - Release aligned with `@newtalaria/browser` 0.5.1. No API changes.

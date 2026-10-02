@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Record one LCP, INP, CLS, and TTFB sample per document load as a `browser.web_vital` child span. The sample stays on the pageload trace after a client-side navigation and does not lengthen the route transaction.
+
 ## 0.5.1
 
 - The browser SDK follows CookieYes, Cookiebot, and Google Consent Mode `analytics_storage`. Analytics, heatmaps, and session replay wait for that choice. Errors still send. Other banners keep using `analytics.optIn()` / `optOut()`.

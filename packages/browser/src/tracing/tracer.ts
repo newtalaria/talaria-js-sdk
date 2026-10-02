@@ -22,11 +22,24 @@ import {
   type Span,
 } from './span.js';
 import type { SpanStatus } from '../transport/spans.js';
-import type { WebVital } from '../integrations/web_vitals.js';
+import {
+  rateWebVital,
+  type WebVital,
+} from '../integrations/web_vitals.js';
 
 /** Server rejects more than 200 spans in one transaction. */
 export const MAX_SPANS_PER_TRANSACTION = 200;
 const AUTO_FLUSH_ENDED = 16;
+const WEB_VITAL_SPAN = 'browser.web_vital';
+
+interface DocumentLoad {
+  traceId: string;
+  spanId: string;
+  sampled: boolean;
+  path: string;
+  startTime: Date;
+  endTime?: Date;
+}
 
 export interface TracerOptions {
   transport: ServerpodTransport;
@@ -56,6 +69,9 @@ export class Tracer {
   private spanCount = 0;
   private droppedCount = 0;
   private pageload: RecordingSpan | null = null;
+  private documentLoad: DocumentLoad | null = null;
+  private readonly emittedVitalNames = new Set<string>();
+  private readonly pendingVitals = new Map<string, WebVital>();
   private lastActivity: Date | null = null;
   private readonly ended: RecordingSpan[] = [];
   private flushChain: Promise<void> = Promise.resolve();
@@ -116,6 +132,13 @@ export class Tracer {
       }
     }
     this.sampled = true;
+    if (
+      this.documentLoad &&
+      this.pageload?.context.traceId === this.documentLoad.traceId
+    ) {
+      this.documentLoad.sampled = true;
+      this.flushPendingVitals();
+    }
   }
 
   startPageload(opts?: { name?: string; url?: string }): Span {
@@ -156,6 +179,17 @@ export class Tracer {
       context: ctx,
     });
     this.pageload = span instanceof RecordingSpan ? span : null;
+    if (this.pageload) {
+      this.documentLoad = {
+        traceId,
+        spanId,
+        sampled: this.sampled,
+        path: opts?.name || '/',
+        startTime: this.pageload.data.startTime,
+      };
+      this.emittedVitalNames.clear();
+      this.pendingVitals.clear();
+    }
     return span;
   }
 
@@ -197,6 +231,9 @@ export class Tracer {
     this.droppedCount = 0;
     this.ended.length = 0;
     this.lastActivity = new Date();
+    if (this.documentLoad && !this.documentLoad.sampled) {
+      this.pendingVitals.clear();
+    }
 
     const ctx: SpanContext = {
       traceId,
@@ -277,20 +314,52 @@ export class Tracer {
   }
 
   recordWebVital(vital: WebVital): void {
-    const value = formatVitalValue(vital);
-    const attrs = { [vital.name]: value };
-    if (this.pageload && !this.pageload.data.flushed) {
-      this.pageload.setAttribute(vital.name, value);
-      this.pageload.addEvent(vital.name, attrs);
-      if (!this.pageload.isEnded()) this.noteActivity();
+    const doc = this.documentLoad;
+    if (!doc || this.disabled) return;
+    if (this.emittedVitalNames.has(vital.name)) return;
+    if (!doc.sampled) {
+      this.pendingVitals.set(vital.name, vital);
       return;
     }
-    if (this.pageload?.isEnded()) return;
-    const child = this.startSpan(`webvital.${vital.name}`, {
+    this.emitVitalSpan(doc, vital);
+  }
+
+  private flushPendingVitals(): void {
+    const doc = this.documentLoad;
+    if (!doc?.sampled) return;
+    for (const vital of this.pendingVitals.values()) {
+      this.emitVitalSpan(doc, vital);
+    }
+  }
+
+  private emitVitalSpan(doc: DocumentLoad, vital: WebVital): void {
+    if (this.emittedVitalNames.has(vital.name)) return;
+    this.emittedVitalNames.add(vital.name);
+    this.pendingVitals.delete(vital.name);
+    const stamp = doc.endTime ?? doc.startTime;
+    const rating = vital.rating ?? rateWebVital(vital.name, vital.value);
+    const child = this.createSpan(WEB_VITAL_SPAN, {
       kind: 'internal',
-      attributes: attrs,
+      parent: { traceId: doc.traceId, spanId: doc.spanId, sampled: true },
+      context: {
+        traceId: doc.traceId,
+        spanId: createSpanId(),
+        sampled: true,
+      },
+      startTime: stamp,
+      attributes: {
+        'browser.web_vital.name': vital.name,
+        'browser.web_vital.value': vital.value,
+        'browser.web_vital.delta': vital.delta ?? vital.value,
+        'browser.web_vital.id': vital.id ?? `${vital.name}-${stamp.getTime()}`,
+        'browser.web_vital.rating': rating,
+        'browser.web_vital.navigation_type': vital.navigationType ?? 'navigate',
+        'http.route': doc.path,
+        'url.path': doc.path,
+      },
     });
-    child?.end();
+    child.end(stamp);
+    void this.flush({ keepalive: true });
   }
 
   endPageload(endTime?: Date): void {
@@ -304,7 +373,14 @@ export class Tracer {
     const start = this.pageload.data.startTime;
     let end = endTime ?? this.lastActivity ?? new Date();
     if (end.getTime() < start.getTime()) end = start;
-    this.pageload.end(end);
+    const ending = this.pageload;
+    ending.end(end);
+    if (
+      this.documentLoad &&
+      ending.context.traceId === this.documentLoad.traceId
+    ) {
+      this.documentLoad.endTime = ending.data.endTime;
+    }
   }
 
   flush(opts?: { keepalive?: boolean }): Promise<void> {
@@ -387,11 +463,17 @@ export class Tracer {
       this.ended.length = 0;
       return;
     }
-    if (!shouldKeepTransaction(this.sampled, this.hasError)) {
+    const keepCurrent = shouldKeepTransaction(this.sampled, this.hasError);
+    const keepDocument = this.documentLoad?.sampled === true;
+    if (!keepCurrent && !keepDocument) {
       return;
     }
 
-    const ready = this.ended.filter((span) => span.isEnded() && !span.data.flushed);
+    const ready = this.ended.filter((span) => {
+      if (!span.isEnded() || span.data.flushed) return false;
+      if (span.data.name === WEB_VITAL_SPAN) return keepDocument;
+      return keepCurrent;
+    });
     if (ready.length === 0) return;
 
     const extras = {
@@ -464,7 +546,3 @@ function httpSpanAttributes(
   return attrs;
 }
 
-function formatVitalValue(vital: WebVital): string {
-  if (vital.name === 'cls') return vital.value.toFixed(4);
-  return String(Math.round(vital.value * 10) / 10);
-}

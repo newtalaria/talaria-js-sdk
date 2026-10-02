@@ -2232,9 +2232,6 @@ export class TalariaClient {
     this.teardowns.push(
       installWebVitals((vital) => {
         this.tracer?.recordWebVital(vital);
-        if (this.tracer?.isTransactionOpen()) {
-          this.armPageloadIdleTimer();
-        }
       }),
     );
 

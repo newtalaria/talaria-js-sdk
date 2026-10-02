@@ -1,96 +1,73 @@
+import { onCLS, onINP, onLCP, onTTFB, type MetricType } from 'web-vitals';
 import type { Teardown } from '../replay/hooks.js';
 
-export type WebVitalName = 'lcp' | 'inp' | 'cls';
+export type WebVitalName = 'lcp' | 'inp' | 'cls' | 'ttfb';
+
+export type WebVitalRating = 'good' | 'needs-improvement' | 'poor';
 
 export interface WebVital {
   name: WebVitalName;
   value: number;
   at: Date;
+  delta?: number;
+  id?: string;
+  rating?: WebVitalRating;
+  navigationType?: string;
 }
 
-type LayoutShiftLike = PerformanceEntry & {
-  value?: number;
-  hadRecentInput?: boolean;
+const THRESHOLDS: Record<WebVitalName, [number, number]> = {
+  lcp: [2500, 4000],
+  inp: [200, 500],
+  cls: [0.1, 0.25],
+  ttfb: [800, 1800],
 };
 
-type EventTimingLike = PerformanceEntry & {
-  duration: number;
-};
+export function rateWebVital(name: WebVitalName, value: number): WebVitalRating {
+  const [good, needsImprovement] = THRESHOLDS[name];
+  if (value <= good) return 'good';
+  if (value <= needsImprovement) return 'needs-improvement';
+  return 'poor';
+}
+
+export function vitalFromMetric(metric: MetricType): WebVital | null {
+  const name = metric.name.toLowerCase();
+  if (name !== 'lcp' && name !== 'inp' && name !== 'cls' && name !== 'ttfb') {
+    return null;
+  }
+  return {
+    name,
+    value: metric.value,
+    at: new Date(),
+    delta: metric.delta,
+    id: metric.id,
+    rating: metric.rating,
+    navigationType: metric.navigationType,
+  };
+}
 
 /**
- * Lightweight Web Vitals via PerformanceObserver (no `web-vitals` dependency).
- * Reports `lcp`, `inp`, and `cls` as they update.
+ * One final LCP, INP, CLS, and TTFB sample per document load.
+ * `web-vitals` reports each metric when Chrome considers it final.
  */
 export function installWebVitals(onVital: (vital: WebVital) => void): Teardown {
-  if (typeof PerformanceObserver === 'undefined') {
+  if (typeof window === 'undefined' || typeof PerformanceObserver === 'undefined') {
     return () => {};
   }
 
-  const observers: PerformanceObserver[] = [];
-  const supported = (type: string): boolean => {
-    try {
-      const types = PerformanceObserver.supportedEntryTypes;
-      if (!types) return true;
-      return Array.from(types).includes(type);
-    } catch {
-      return true;
-    }
+  let stopped = false;
+  const report = (metric: MetricType): void => {
+    if (stopped) return;
+    const vital = vitalFromMetric(metric);
+    if (!vital) return;
+    onVital(vital);
   };
 
-  const observe = (
-    type: string,
-    callback: PerformanceObserverCallback,
-    extra?: Record<string, unknown>,
-  ): boolean => {
-    if (!supported(type)) return false;
-    try {
-      const po = new PerformanceObserver(callback);
-      po.observe({ type, buffered: true, ...extra } as PerformanceObserverInit);
-      observers.push(po);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  observe('largest-contentful-paint', (list) => {
-    const entries = list.getEntries();
-    const last = entries[entries.length - 1];
-    if (!last) return;
-    onVital({ name: 'lcp', value: last.startTime, at: new Date() });
-  });
-
-  let inp = 0;
-  const onEventTiming: PerformanceObserverCallback = (list) => {
-    for (const entry of list.getEntries() as EventTimingLike[]) {
-      const duration = entry.duration;
-      if (typeof duration !== 'number' || duration <= inp) continue;
-      inp = duration;
-      onVital({ name: 'inp', value: inp, at: new Date() });
-    }
-  };
-  if (!observe('event', onEventTiming, { durationThreshold: 16 })) {
-    observe('first-input', onEventTiming);
-  }
-
-  let cls = 0;
-  observe('layout-shift', (list) => {
-    for (const entry of list.getEntries() as LayoutShiftLike[]) {
-      if (entry.hadRecentInput) continue;
-      const value = typeof entry.value === 'number' ? entry.value : 0;
-      cls += value;
-      onVital({ name: 'cls', value: cls, at: new Date() });
-    }
-  });
+  onLCP(report);
+  onINP(report);
+  onCLS(report);
+  onTTFB(report);
 
   return () => {
-    for (const po of observers) {
-      try {
-        po.disconnect();
-      } catch {
-        // ignore
-      }
-    }
-    observers.length = 0;
+    stopped = true;
   };
 }
