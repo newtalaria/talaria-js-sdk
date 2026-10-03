@@ -40,6 +40,18 @@ describe('parseStackTrace', () => {
     assert.equal(parsed!.frames[2]!.platform, 'javascript');
   });
 
+  it('keeps a hashed bundle basename and drops the query', () => {
+    const stack = `TypeError: boom
+    at a (https://cdn.example/static/main.a1b2c3.js?v=1:1:1)`;
+    const parsed = parseStackTrace(stack, { pageOrigin: 'https://cdn.example' });
+    assert.ok(parsed);
+    assert.equal(parsed!.frames[0]!.filename, 'main.a1b2c3.js');
+    assert.equal(
+      parsed!.frames[0]!.absPath,
+      'https://cdn.example/static/main.a1b2c3.js',
+    );
+  });
+
   it('marks third-party CDN and SDK frames as not inApp', () => {
     const stack = `NetworkError: Failed to load
     at Ah.r.send (https://cdn.jsdelivr.net/npm/@newtalaria/browser@0.1.18/+esm:141:20535)

@@ -15,7 +15,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @newtalaria/core && npm run build -w @newtalaria/browser && npm run build -w @newtalaria/node && npm run build -w @newtalaria/react && npm run build -w @newtalaria/nextjs",
+    "build": "npm run build -w @newtalaria/core && npm run build -w @newtalaria/cli && npm run build -w @newtalaria/browser && npm run build -w @newtalaria/node && npm run build -w @newtalaria/react && npm run build -w @newtalaria/nextjs",
     "test": "npm run build && npm run test --workspaces --if-present",
     "test:core": "npm run test -w @newtalaria/core",
     "test:browser": "npm run test -w @newtalaria/browser",

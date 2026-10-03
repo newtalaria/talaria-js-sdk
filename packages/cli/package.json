@@ -1,0 +1,49 @@
+{
+  "name": "@newtalaria/cli",
+  "version": "0.5.3",
+  "description": "Upload JavaScript source maps to Talaria for a release",
+  "type": "module",
+  "bin": {
+    "talaria": "./dist/bin.js"
+  },
+  "main": "./dist/upload.js",
+  "types": "./dist/upload.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/upload.d.ts",
+      "import": "./dist/upload.js",
+      "default": "./dist/upload.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "test": "esbuild test/*.test.ts --bundle --platform=node --format=esm --outdir=test/dist && node --test test/dist/*.test.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@newtalaria/core": "^0.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/newtalaria/talaria-js-sdk.git",
+    "directory": "packages/cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
