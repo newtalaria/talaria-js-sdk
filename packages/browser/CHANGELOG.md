@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- `Talaria.setContext` and `Talaria.setExtra` attach named context and extra to captured events.
+
 ## 0.5.2
 
 - Record one LCP, INP, CLS, and TTFB sample per document load as a `browser.web_vital` child span. The sample stays on the pageload trace after a client-side navigation and does not lengthen the route transaction.

@@ -17,7 +17,7 @@ export type {
   UserContext,
 } from './types.js';
 
-export { Scope } from './scope.js';
+export { Scope, type ScopeContext } from './scope.js';
 
 export {
   AnalyticsFacade,

@@ -1,12 +1,17 @@
 export { Talaria } from '@newtalaria/node/api';
 export type { TalariaNodeInitOptions } from '@newtalaria/node/api';
 
-import { Talaria } from '@newtalaria/node/api';
+import { getNodeClient, Talaria } from '@newtalaria/node/api';
+import { installOutgoingHttpInstrumentation } from '@newtalaria/node';
 import type { TalariaNodeInitOptions } from '@newtalaria/node/api';
 
-/** Call from `talaria.server.config.ts` or `instrumentation.ts` (nodejs). */
+/**
+ * Call from `talaria.server.config.ts` or `instrumentation.ts` (nodejs).
+ * Outgoing `http` / `https` gets a client span and `traceparent` once tracing is on.
+ */
 export function initServer(options: TalariaNodeInitOptions): void {
   Talaria.init(options);
+  installOutgoingHttpInstrumentation(getNodeClient());
 }
 
 /**

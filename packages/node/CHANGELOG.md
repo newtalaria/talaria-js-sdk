@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.3
+
+- `setContext` and `setExtra` on the Node client.
+- Outgoing `http`, `https`, and `fetch` get a client span and `traceparent` when project config turns tracing on. The patch waits for that config, including calls that start before it arrives. Talaria ingest URLs are skipped.
+
 ## 0.5.2
 
 - Release aligned with `@newtalaria/browser` 0.5.2. No API changes.

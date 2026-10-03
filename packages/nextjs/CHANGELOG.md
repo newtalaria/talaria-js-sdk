@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.3
+
+- Server init continues traces on outgoing Node HTTP and `fetch` once tracing is on.
+- Edge runtime: `captureMessage`, breadcrumbs on errors, and `setUser`, `setTag`, `setTags`, `setExtra`, and `setContext`.
+
 ## 0.5.2
 
 - Release aligned with `@newtalaria/browser` 0.5.2. The client still records Web Vitals through `@newtalaria/browser`.

@@ -992,6 +992,14 @@ export class TalariaClient {
     });
   }
 
+  setExtra(key: string, value: unknown): void {
+    this.scope.setExtra(key, value);
+  }
+
+  setContext(name: string, context: Record<string, unknown> | null): void {
+    this.scope.setContext(name, context);
+  }
+
   getUserId(): string | undefined {
     return this.scope.getUserId() ?? this.options?.userId;
   }
@@ -1639,7 +1647,9 @@ export class TalariaClient {
     let level = args.level;
     let title = args.title ?? args.context?.title;
     let exception = args.exception;
-    let contextExtra = args.context?.extra as Record<string, unknown> | undefined;
+    let contextExtra = this.scope.mergeCaptureExtra(
+      args.context?.extra as Record<string, unknown> | undefined,
+    );
     let userId = args.context?.userId ?? this.getUserId();
     let appTags = mergeTags(
       this.browserContext ? browserContextTags(this.browserContext) : {},

@@ -144,6 +144,7 @@ export class TalariaNodeClient {
         getAnonymousId: () => this.identity?.getAnonymousId() ?? null,
         onPermanentIngestError: (error) => this.disable(error, 'spans'),
       });
+      this.notifyTracerReady();
     } else if (!tracingOn) {
       this.tracer?.disable();
     }
@@ -198,6 +199,14 @@ export class TalariaNodeClient {
   setUser(user: UserContext | null): void {
     this.scope.setUser(user);
     void this.flagsClient?.setContext({ userId: user?.id ?? null });
+  }
+
+  setExtra(key: string, value: unknown): void {
+    this.scope.setExtra(key, value);
+  }
+
+  setContext(name: string, context: Record<string, unknown> | null): void {
+    this.scope.setContext(name, context);
   }
 
   get analytics(): AnalyticsFacade {
@@ -290,6 +299,19 @@ export class TalariaNodeClient {
 
   getSpanId(): string | null {
     return this.tracer?.getSpanId() ?? null;
+  }
+
+  private tracerReadyListeners: Array<(tracer: NodeTracer) => void> = [];
+
+  /** Runs [listener] now if a tracer exists, and again when one is created. */
+  onTracerReady(listener: (tracer: NodeTracer) => void): void {
+    this.tracerReadyListeners.push(listener);
+    if (this.tracer) listener(this.tracer);
+  }
+
+  private notifyTracerReady(): void {
+    if (!this.tracer) return;
+    for (const listener of this.tracerReadyListeners) listener(this.tracer);
   }
 
   getTracer(): NodeTracer | null {
@@ -389,7 +411,7 @@ export class TalariaNodeClient {
       this.flagsClient?.stampTags(),
       args.context?.tags,
     );
-    const extra = args.context?.extra;
+    const extra = this.scope.mergeCaptureExtra(args.context?.extra);
     try {
       await this.eventQueue?.enqueue({
           message: args.message,

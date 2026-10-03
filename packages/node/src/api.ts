@@ -22,6 +22,12 @@ export const Talaria = {
   setUser(user: UserContext | null): void {
     client.setUser(user);
   },
+  setExtra(key: string, value: unknown): void {
+    client.setExtra(key, value);
+  },
+  setContext(name: string, context: Record<string, unknown> | null): void {
+    client.setContext(name, context);
+  },
   addBreadcrumb: client.addBreadcrumb.bind(client),
   startSpan: client.startSpan.bind(client),
   startInactiveSpan: client.startInactiveSpan.bind(client),

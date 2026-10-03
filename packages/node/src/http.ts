@@ -30,6 +30,30 @@ function requestUrl(options: RequestOptions | string | URL, protocol: string): s
   return `${protocol}//${host}${port}${path}`;
 }
 
+type RequestArg = RequestOptions | string | URL | ((res: IncomingMessage) => void);
+
+function callArgs(
+  urlOrOpts: RequestOptions | string | URL,
+  cbOrOpts?: RequestOptions | ((res: IncomingMessage) => void),
+  maybeCb?: (res: IncomingMessage) => void,
+): { options: RequestOptions; args: RequestArg[] } {
+  if (typeof urlOrOpts === 'string' || urlOrOpts instanceof URL) {
+    if (typeof cbOrOpts === 'function') {
+      const options: RequestOptions = {};
+      return { options, args: [urlOrOpts, options, cbOrOpts] };
+    }
+    const options = cbOrOpts ?? {};
+    return maybeCb
+      ? { options, args: [urlOrOpts, options, maybeCb] }
+      : { options, args: [urlOrOpts, options] };
+  }
+  return maybeCb
+    ? { options: urlOrOpts, args: [urlOrOpts, cbOrOpts as RequestOptions, maybeCb] }
+    : cbOrOpts
+      ? { options: urlOrOpts, args: [urlOrOpts, cbOrOpts as (res: IncomingMessage) => void] }
+      : { options: urlOrOpts, args: [urlOrOpts] };
+}
+
 function patchOutgoing(
   mod: typeof http | typeof https,
   protocol: string,
@@ -40,14 +64,9 @@ function patchOutgoing(
     this: unknown,
     urlOrOpts: RequestOptions | string | URL,
     cbOrOpts?: RequestOptions | ((res: IncomingMessage) => void),
-    _maybeCb?: (res: IncomingMessage) => void,
+    maybeCb?: (res: IncomingMessage) => void,
   ) {
-    const options =
-      typeof urlOrOpts === 'string' || urlOrOpts instanceof URL
-        ? typeof cbOrOpts === 'object'
-          ? cbOrOpts
-          : {}
-        : urlOrOpts;
+    const { options, args } = callArgs(urlOrOpts, cbOrOpts, maybeCb);
     const url = requestUrl(
       typeof urlOrOpts === 'string' || urlOrOpts instanceof URL ? urlOrOpts : options,
       protocol,
@@ -57,7 +76,7 @@ function patchOutgoing(
     }
 
     const ctx = getCurrentSpanContext();
-    if (ctx && options && typeof options === 'object') {
+    if (ctx) {
       const headers = { ...(options.headers ?? {}) } as Record<string, string | string[] | undefined>;
       headers.traceparent = formatTraceparent(ctx);
       options.headers = headers;
@@ -74,7 +93,7 @@ function patchOutgoing(
         'url.full': url,
       },
     });
-    const req = original.apply(this, arguments as unknown as Parameters<typeof original>);
+    const req = original.apply(this, args as unknown as Parameters<typeof original>);
     req.on('response', (res: IncomingMessage) => {
       if (typeof res.statusCode === 'number') {
         span?.setAttribute('http.response.status_code', res.statusCode);
@@ -95,8 +114,19 @@ function patchOutgoing(
     return req;
   };
   (mod as { request: typeof original }).request = patched as typeof original;
+  const originalGet = mod.get;
+  const patchedGet = function (
+    this: unknown,
+    ...args: Parameters<typeof originalGet>
+  ) {
+    const req = patched.apply(this, args);
+    req.end();
+    return req;
+  };
+  mod.get = patchedGet as typeof originalGet;
   return () => {
     (mod as { request: typeof original }).request = original;
+    mod.get = originalGet;
   };
 }
 
@@ -128,6 +158,70 @@ export function instrumentOutgoingHttp(opts: HttpInstrumentOptions): () => void 
   return () => {
     undoHttp();
     undoHttps();
+  };
+}
+
+type FetchInput = Parameters<typeof fetch>[0];
+
+function fetchInputUrl(input: FetchInput): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+/** Continue the active trace across global `fetch` (Next.js server calls). */
+export function instrumentOutgoingFetch(opts: HttpInstrumentOptions): () => void {
+  const original = globalThis.fetch;
+  const patched = (async (input: FetchInput, init?: RequestInit) => {
+    const url = fetchInputUrl(input);
+    if (isIgnored(url, opts)) return original.call(globalThis, input, init);
+    const ctx = getCurrentSpanContext();
+    const method = (
+      init?.method ||
+      (typeof Request !== 'undefined' && input instanceof Request ? input.method : 'GET')
+    ).toUpperCase();
+    let path = '/';
+    try {
+      path = new URL(url, 'http://localhost').pathname;
+    } catch {
+      path = '/';
+    }
+    const span = opts.tracer.startSpan(`${method} ${path}`, {
+      kind: 'client',
+      attributes: {
+        'http.request.method': method,
+        'url.full': url,
+      },
+    });
+    const headers = new Headers(
+      init?.headers ??
+        (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined),
+    );
+    if (ctx && !headers.has('traceparent')) {
+      headers.set('traceparent', formatTraceparent(ctx));
+    }
+    try {
+      const response = await original.call(globalThis, input, { ...init, headers });
+      span?.setAttribute('http.response.status_code', response.status);
+      if (response.status >= 500) {
+        span?.setStatus('error', `HTTP ${response.status}`);
+        opts.tracer.markError();
+      } else {
+        span?.setStatus('ok');
+      }
+      span?.end();
+      return response;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      span?.setStatus('error', message);
+      opts.tracer.markError();
+      span?.end();
+      throw error;
+    }
+  }) as typeof fetch;
+  globalThis.fetch = patched;
+  return () => {
+    globalThis.fetch = original;
   };
 }
 

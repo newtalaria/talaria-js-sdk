@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- Named context and extra on the scope (`setContext`, `setExtra`). Call-site extra still wins.
+
 ## 0.5.2
 
 - Release aligned with `@newtalaria/browser` 0.5.2. No API changes.

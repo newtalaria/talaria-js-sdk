@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- Depends on `@newtalaria/browser` ^0.5.3 (`setContext`, `setExtra`).
+
 ## 0.5.2
 
 - Depends on `@newtalaria/browser` ^0.5.2, which records Web Vitals.

@@ -17,4 +17,28 @@ describe('Scope', () => {
     scope.setTag('feature', 'checkout');
     assert.deepEqual(scope.getTags(), { service: 'web', feature: 'checkout' });
   });
+
+  it('copies named context and extra onto the capture bag', () => {
+    const scope = new Scope();
+    scope.setExtra('plan', 'pro');
+    scope.setContext('checkout', { step: 'payment' });
+    assert.deepEqual(scope.mergeCaptureExtra({ requestId: 'r-1' }), {
+      plan: 'pro',
+      checkout: { step: 'payment' },
+      requestId: 'r-1',
+    });
+  });
+
+  it('lets call-site extra replace a named context and clears on null', () => {
+    const scope = new Scope();
+    scope.setContext('checkout', { step: 'payment' });
+    scope.setExtra('plan', 'pro');
+    assert.deepEqual(scope.mergeCaptureExtra({ checkout: { step: 'review' } }), {
+      plan: 'pro',
+      checkout: { step: 'review' },
+    });
+    scope.setContext('checkout', null);
+    scope.setExtra('plan', null);
+    assert.equal(scope.mergeCaptureExtra(), undefined);
+  });
 });

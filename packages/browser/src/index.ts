@@ -130,6 +130,14 @@ export const Talaria = {
     client.setUser(user);
   },
 
+  setExtra(key: string, value: unknown): void {
+    client.setExtra(key, value);
+  },
+
+  setContext(name: string, context: Record<string, unknown> | null): void {
+    client.setContext(name, context);
+  },
+
   addBreadcrumb(
     crumb: Partial<import('./types.js').Breadcrumb> & {
       type?: string;
