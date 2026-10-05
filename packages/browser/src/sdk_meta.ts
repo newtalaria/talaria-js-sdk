@@ -1,3 +1,3 @@
 /** Bumped with package.json version for event metadata. */
 export const SDK_NAME = '@newtalaria/browser';
-export const SDK_VERSION = '0.5.3';
+export const SDK_VERSION = '0.5.4';

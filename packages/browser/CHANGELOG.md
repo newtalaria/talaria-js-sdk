@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- Release aligned with `@newtalaria/node` 0.5.4. No API changes.
+
 ## 0.5.3
 
 - `Talaria.setContext` and `Talaria.setExtra` attach named context and extra to captured events.

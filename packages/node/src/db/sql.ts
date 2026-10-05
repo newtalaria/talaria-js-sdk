@@ -1,13 +1,14 @@
 import type { Span } from '@newtalaria/core';
-import type { TalariaNodeClient } from './client.js';
+import type { TalariaNodeClient } from '../client.js';
 
 export interface Queryable {
   query: (...args: unknown[]) => Promise<unknown> | unknown;
 }
 
 /**
- * Wrap a `pg` / `mysql2` pool or connection so queries become DB spans.
- * Optional — the driver is a peer dependency you already installed.
+ * Wrap any client with a `query` method so each call becomes a DB span.
+ * `pg` and `mysql2` use this. Pass the OpenTelemetry system name (`postgresql`, `mysql`).
+ * The driver stays a peer dependency you already installed.
  */
 export function wrapQueryable<T extends Queryable>(
   client: TalariaNodeClient,
@@ -63,49 +64,14 @@ export function wrapQueryable<T extends Queryable>(
   return target;
 }
 
-export function wrapPg<T extends Queryable>(client: TalariaNodeClient, target: T): T {
-  return wrapQueryable(client, target, 'postgresql');
-}
-
-export function wrapMysql2<T extends Queryable>(client: TalariaNodeClient, target: T): T {
-  return wrapQueryable(client, target, 'mysql');
-}
-
-export interface RedisLike {
-  sendCommand?: (...args: unknown[]) => Promise<unknown>;
-}
-
-export function wrapRedis<T extends RedisLike>(client: TalariaNodeClient, target: T): T {
-  if (typeof target.sendCommand !== 'function') return target;
-  const original = target.sendCommand.bind(target);
-  target.sendCommand = ((...args: unknown[]) => {
-    const command = Array.isArray(args[0]) ? String((args[0] as unknown[])[0] ?? 'command') : 'command';
-    const span = client.startSpan(`db redis ${command}`, {
-      kind: 'client',
-      attributes: { 'db.system': 'redis', 'db.operation': command },
-    });
-    return original(...args).then(
-      (value) => {
-        span?.setStatus('ok');
-        span?.end();
-        return value;
-      },
-      (error: unknown) => {
-        span?.setStatus('error', error instanceof Error ? error.message : String(error));
-        span?.end();
-        throw error;
-      },
-    );
-  }) as T['sendCommand'];
-  return target;
-}
-
-function operationName(sql: string): string {
+export function operationName(sql: string): string {
   const match = /^\s*([A-Za-z]+)/.exec(sql);
-  return match?.[1] ? match[1].toUpperCase() : 'QUERY';
+  const verb = match?.[1] ? match[1].toUpperCase() : 'QUERY';
+  if (verb === 'FROM') return 'SELECT';
+  return verb;
 }
 
-function spanName(sql: string, system: string): string {
+export function spanName(sql: string, system: string): string {
   const operation = operationName(sql);
   const table = /\b(?:FROM|INTO|UPDATE|TABLE)\s+(?:`|"|\[)?([A-Za-z_][A-Za-z0-9_.]*)/i.exec(sql);
   const name = table?.[1];
@@ -113,7 +79,8 @@ function spanName(sql: string, system: string): string {
   return sql ? operation : `db ${system}`;
 }
 
-function queryText(sql: string): string {
+/** Strip string literals and numbers so a span can group on statement shape. */
+export function queryText(sql: string): string {
   if (!sql) return '';
   const stripped = sql
     .replace(/'(?:\\'|[^'])*'/g, '?')

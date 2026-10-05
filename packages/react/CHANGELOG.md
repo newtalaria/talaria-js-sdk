@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- Depends on `@newtalaria/browser` ^0.5.4. No API changes.
+
 ## 0.5.3
 
 - Depends on `@newtalaria/browser` ^0.5.3 (`setContext`, `setExtra`).

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- Depends on `@newtalaria/node` ^0.5.4 (`wrapDuckDB`, database wrappers split by driver).
+
 ## 0.5.3
 
 - Server init continues traces on outgoing Node HTTP and `fetch` once tracing is on.

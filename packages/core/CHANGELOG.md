@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- Release aligned with `@newtalaria/node` 0.5.4. No API changes.
+
 ## 0.5.3
 
 - Named context and extra on the scope (`setContext`, `setExtra`). Call-site extra still wins.

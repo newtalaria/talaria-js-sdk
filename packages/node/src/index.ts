@@ -35,8 +35,20 @@ import type { TalariaNodeInitOptions } from './types.js';
 
 export { installOutgoingHttpInstrumentation } from './outgoing.js';
 
+/** Own methods only. Spreading the API object would call the `flags` getter before init. */
+function apiMethods(source: typeof ApiTalaria): Omit<typeof ApiTalaria, 'analytics' | 'flags'> {
+  const out = {} as Omit<typeof ApiTalaria, 'analytics' | 'flags'>;
+  for (const key of Object.keys(source) as Array<keyof typeof ApiTalaria>) {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key);
+    if (!descriptor || typeof descriptor.get === 'function') continue;
+    if (typeof descriptor.value !== 'function') continue;
+    (out as Record<string, unknown>)[key] = descriptor.value;
+  }
+  return out;
+}
+
 export const Talaria = {
-  ...ApiTalaria,
+  ...apiMethods(ApiTalaria),
   init(options: TalariaNodeInitOptions): void {
     ApiTalaria.init(options);
     installOutgoingHttpInstrumentation(getNodeClient());
@@ -56,6 +68,6 @@ export function handleHttpRequest(req: IncomingMessage, res: ServerResponse): vo
   attachRequestListener(req, res, tracer);
 }
 
-export { wrapMysql2, wrapPg, wrapQueryable, wrapRedis } from './db.js';
+export { wrapDuckDB, wrapMysql2, wrapPg, wrapQueryable, wrapRedis } from './db/index.js';
 
 export default Talaria;

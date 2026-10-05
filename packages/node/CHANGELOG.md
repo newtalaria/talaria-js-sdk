@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.4
+
+- Optional `wrapDuckDB` records a CLIENT span and a query breadcrumb for `@duckdb/node-api` (`run`, `stream`, `prepare`, `runAndRead*`, and pending `start`). Bound parameter values and result rows stay in the app. A thrown query calls `captureException` with the sanitized statement.
+- Database wrappers live in `src/db/` (`pg`, `mysql`, `redis`, `duckdb`). `wrapPg`, `wrapMysql2`, `wrapRedis`, `wrapQueryable`, and `wrapDuckDB` are unchanged.
+- `wrapRedis` reads the command name from an ioredis `Command` (`name`) as well as from a `node-redis` argument array.
+- Importing `@newtalaria/node` no longer reads `flags` before `Talaria.init`.
+
 ## 0.5.3
 
 - `setContext` and `setExtra` on the Node client.

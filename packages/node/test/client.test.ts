@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { Talaria, wrapDuckDB } from '../src/index.ts';
 import { TalariaNodeClient } from '../src/client.ts';
+
+describe('package entry', () => {
+  it('imports before init', () => {
+    assert.equal(typeof Talaria.init, 'function');
+    assert.equal(typeof wrapDuckDB, 'function');
+  });
+});
 
 describe('TalariaNodeClient', () => {
   it('sends captureException via events/ingestBatch', async () => {
