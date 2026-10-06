@@ -31,6 +31,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname } from 'node:path';
 import { SDK_NAME, SDK_VERSION } from './sdk_meta.js';
+import { readModelErrorStamp } from './model_http.js';
 import { NodeTracer } from './tracer.js';
 import type { TalariaNodeInitOptions } from './types.js';
 
@@ -335,12 +336,25 @@ export class TalariaNodeClient {
 
   async captureException(error: unknown, context?: CaptureContext): Promise<void> {
     const err = error instanceof Error ? error : new Error(String(error));
+    const stamp = readModelErrorStamp(error) ?? readModelErrorStamp(err);
+    const tags = { ...context?.tags };
+    const extra = { ...context?.extra };
+    if (stamp) {
+      if (stamp.model) tags['gen_ai.request.model'] = stamp.model;
+      tags['gen_ai.operation.name'] = stamp.operation;
+      tags['gen_ai.provider.name'] = stamp.provider;
+      if (stamp.statusCode != null) extra.status_code = stamp.statusCode;
+    }
     await this.send({
       message: err.message || String(error),
       level: 'error',
       title: err.name || 'Error',
       stackTrace: err.stack,
-      context,
+      context: {
+        ...context,
+        tags: Object.keys(tags).length ? tags : context?.tags,
+        extra: Object.keys(extra).length ? extra : context?.extra,
+      },
     });
   }
 

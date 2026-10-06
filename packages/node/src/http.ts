@@ -8,11 +8,23 @@ import {
   toSpanContext,
 } from '@newtalaria/core';
 import type { NodeTracer } from './tracer.js';
+import {
+  classifyModelUrl,
+  isModelFetchBypass,
+  traceModelFetch,
+  traceModelNodeRequest,
+  type ModelFetchHooks,
+} from './model_http.js';
 
 export interface HttpInstrumentOptions {
   tracer: NodeTracer;
   talariaBaseUrl?: string;
   ignoreUrls?: string[];
+  addBreadcrumb?: ModelFetchHooks['addBreadcrumb'];
+}
+
+function modelHooks(opts: HttpInstrumentOptions): ModelFetchHooks {
+  return { tracer: opts.tracer, addBreadcrumb: opts.addBreadcrumb };
 }
 
 function isIgnored(rawUrl: string, opts: HttpInstrumentOptions): boolean {
@@ -86,6 +98,12 @@ function patchOutgoing(
       (typeof options === 'object' && options.method) ||
       'GET'
     ).toUpperCase();
+    const modelEndpoint = classifyModelUrl(url, method);
+    if (modelEndpoint) {
+      const req = original.apply(this, args as unknown as Parameters<typeof original>);
+      traceModelNodeRequest(modelHooks(opts), modelEndpoint, req);
+      return req;
+    }
     const span = opts.tracer.startSpan(`${method} ${new URL(url, 'http://localhost').pathname}`, {
       kind: 'client',
       attributes: {
@@ -173,6 +191,7 @@ function fetchInputUrl(input: FetchInput): string {
 export function instrumentOutgoingFetch(opts: HttpInstrumentOptions): () => void {
   const original = globalThis.fetch;
   const patched = (async (input: FetchInput, init?: RequestInit) => {
+    if (isModelFetchBypass()) return original.call(globalThis, input, init);
     const url = fetchInputUrl(input);
     if (isIgnored(url, opts)) return original.call(globalThis, input, init);
     const ctx = getCurrentSpanContext();
@@ -180,6 +199,16 @@ export function instrumentOutgoingFetch(opts: HttpInstrumentOptions): () => void
       init?.method ||
       (typeof Request !== 'undefined' && input instanceof Request ? input.method : 'GET')
     ).toUpperCase();
+    const modelEndpoint = classifyModelUrl(url, method);
+    if (modelEndpoint) {
+      return traceModelFetch(
+        modelHooks(opts),
+        modelEndpoint,
+        input,
+        init,
+        (nextInput, nextInit) => original.call(globalThis, nextInput, nextInit),
+      );
+    }
     let path = '/';
     try {
       path = new URL(url, 'http://localhost').pathname;

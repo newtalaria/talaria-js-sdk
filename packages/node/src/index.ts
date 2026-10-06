@@ -69,5 +69,6 @@ export function handleHttpRequest(req: IncomingMessage, res: ServerResponse): vo
 }
 
 export { wrapDuckDB, wrapMysql2, wrapPg, wrapQueryable, wrapRedis } from './db/index.js';
+export { wrapModelFetch } from './model_http.js';
 
 export default Talaria;

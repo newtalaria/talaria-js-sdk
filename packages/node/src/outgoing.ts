@@ -1,5 +1,6 @@
 import type { TalariaNodeClient } from './client.js';
 import { instrumentOutgoingFetch, instrumentOutgoingHttp } from './http.js';
+import { bindModelFetchHooks } from './model_http.js';
 
 const installed = new WeakSet<TalariaNodeClient>();
 
@@ -21,7 +22,15 @@ export function installOutgoingHttpInstrumentation(client: TalariaNodeClient): v
       tracer,
       talariaBaseUrl: httpOpts.baseUrl,
       ignoreUrls: httpOpts.ignoreUrls,
+      addBreadcrumb: (crumb: {
+        type?: string;
+        category?: string;
+        message?: string;
+        level?: string;
+        data?: Record<string, string>;
+      }) => client.addBreadcrumb(crumb),
     };
+    bindModelFetchHooks(httpOptsForPatch);
     const stopHttp = instrumentOutgoingHttp(httpOptsForPatch);
     const stopFetch = instrumentOutgoingFetch(httpOptsForPatch);
     const stop = () => {
