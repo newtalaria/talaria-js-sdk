@@ -23,8 +23,10 @@ Defaults are `http://localhost:8080` and release `local`. The command prints tha
 
 ## CI
 
+Use the same release string the app sends. The GitHub Actions workflow is in [Releases](https://www.newtalaria.com/docs/guides/releases).
+
 ```sh
-export TALARIA_RELEASE="$(git rev-parse HEAD)"
+export TALARIA_RELEASE="${GITHUB_REF_NAME}@${GITHUB_SHA::7}"
 npx talaria sourcemaps upload \
   --url "$TALARIA_BASE_URL" \
   --api-key "$TALARIA_RELEASE_KEY" \

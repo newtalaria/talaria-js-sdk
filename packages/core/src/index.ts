@@ -169,6 +169,13 @@ export {
 
 export { createId } from './utils/id.js';
 export {
+  readProcessReleaseEnv,
+  resolveReleaseIdentity,
+  type ReleaseEnv,
+  type ReleaseIdentity,
+  type ReleaseRefKind,
+} from './release.js';
+export {
   maxSeverity,
   normalizeSeverity,
   SEVERITY_ORDER,

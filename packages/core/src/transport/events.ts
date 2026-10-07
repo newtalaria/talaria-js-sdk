@@ -21,6 +21,7 @@ export interface IngestEventParams {
   platform?: string;
   release?: string;
   commitSha?: string;
+  releaseRefKind?: 'branch' | 'tag';
   userId?: string;
   anonymousId?: string;
   sessionId?: string;
@@ -52,6 +53,7 @@ function serializeEvent(params: IngestEventParams): Record<string, unknown> {
   if (params.platform) input.platform = params.platform;
   if (params.release) input.release = params.release;
   if (params.commitSha) input.commitSha = params.commitSha;
+  if (params.releaseRefKind) input.releaseRefKind = params.releaseRefKind;
   if (params.userId) input.userId = params.userId;
   if (params.anonymousId) input.anonymousId = params.anonymousId;
   if (params.sessionId) input.sessionId = params.sessionId;

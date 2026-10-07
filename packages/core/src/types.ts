@@ -136,6 +136,8 @@ export interface CoreInitOptions {
   apiKey: string;
   release?: string;
   commitSha?: string;
+  /** `branch` or `tag` when the SDK resolved the release from CI. */
+  releaseRefKind?: 'branch' | 'tag';
   minLevel?: SeverityLevel;
   enforceDefaultLevel?: boolean;
   loggers?: Record<string, LoggerPreset>;

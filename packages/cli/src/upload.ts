@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { ServerpodTransport } from '@newtalaria/core';
+import { ServerpodTransport, resolveReleaseIdentity } from '@newtalaria/core';
 
 const FILE_NAME = /^[A-Za-z0-9._~+-]+$/;
 const LOCAL_URL = 'http://localhost:8080';
@@ -35,7 +35,11 @@ export async function uploadSourceMaps(
   }
 
   const url = parsed.url || options.env.TALARIA_BASE_URL || LOCAL_URL;
-  const release = parsed.release || options.env.TALARIA_RELEASE || 'local';
+  const release =
+    resolveReleaseIdentity({
+      release: parsed.release,
+      env: options.env,
+    }).release || 'local';
   const apiKey =
     parsed.apiKey ||
     options.env.TALARIA_RELEASE_KEY ||

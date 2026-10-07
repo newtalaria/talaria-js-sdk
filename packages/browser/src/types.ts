@@ -171,6 +171,7 @@ export interface ResolvedOptions {
   apiKey: string;
   release?: string;
   commitSha?: string;
+  releaseRefKind?: 'branch' | 'tag';
   minLevel: SeverityLevel;
   enforceDefaultLevel: boolean;
   loggers: Record<string, LoggerPreset>;

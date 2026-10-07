@@ -11,6 +11,10 @@ import type {
 } from './types.js';
 import { createId } from './utils/id.js';
 import {
+  readProcessReleaseEnv,
+  resolveReleaseIdentity,
+} from '@newtalaria/core';
+import {
   DEFAULT_IGNORE_ERRORS,
   shouldDropCapturedError,
   shouldIgnoreErrorMessage,
@@ -344,12 +348,18 @@ function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
   if (!options.apiKey?.trim()) {
     throw new Error('@newtalaria/browser: init requires `apiKey`');
   }
+  const identity = resolveReleaseIdentity({
+    release: options.release,
+    commitSha: options.commitSha,
+    env: readProcessReleaseEnv(),
+  });
 
   return {
     baseUrl,
     apiKey: options.apiKey.trim(),
-    release: options.release,
-    commitSha: options.commitSha?.trim() || undefined,
+    release: identity.release,
+    commitSha: identity.commitSha,
+    releaseRefKind: identity.releaseRefKind,
     minLevel:
       normalizeSeverity(String(options.minLevel ?? 'debug')) ?? 'debug',
     enforceDefaultLevel: Boolean(options.enforceDefaultLevel),
@@ -1838,6 +1848,7 @@ export class TalariaClient {
         platform: args.platform,
         release: this.options.release,
         commitSha: this.options.commitSha,
+        releaseRefKind: this.options.releaseRefKind,
         userId,
         anonymousId: this.identity?.getAnonymousId() ?? undefined,
         sessionId: this.sessionId ?? undefined,

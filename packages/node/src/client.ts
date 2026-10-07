@@ -19,6 +19,7 @@ import {
   tombstoneFromError,
   tombstoneIsQuiet,
   writePolicyCache,
+  resolveReleaseIdentity,
   type Breadcrumb,
   type CaptureContext,
   type SdkConfigDocument,
@@ -67,9 +68,17 @@ export class TalariaNodeClient {
     }
     const baseUrl = (raw.dsn || raw.baseUrl || '').replace(/\/+$/, '');
     if (!baseUrl) throw new Error('@newtalaria/node: init requires dsn or baseUrl');
+    const identity = resolveReleaseIdentity({
+      release: raw.release,
+      commitSha: raw.commitSha,
+      env: process.env,
+    });
     this.options = {
       ...raw,
       baseUrl,
+      release: identity.release,
+      commitSha: identity.commitSha,
+      releaseRefKind: identity.releaseRefKind,
       minLevel: raw.minLevel ?? 'debug',
       tracingEnabled: false,
       tracesSampleRate: 0,
@@ -455,6 +464,7 @@ export class TalariaNodeClient {
           platform: PLATFORM,
           release: this.options.release,
           commitSha: this.options.commitSha,
+          releaseRefKind: this.options.releaseRefKind,
           userId,
           anonymousId: this.identity?.getAnonymousId() ?? undefined,
           sessionId: this.sessionId ?? undefined,

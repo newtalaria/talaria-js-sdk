@@ -5,6 +5,8 @@ import {
   normalizeBreadcrumb,
   Scope,
   ServerpodTransport,
+  resolveReleaseIdentity,
+  readProcessReleaseEnv,
   type Breadcrumb,
   type CaptureContext,
   type CoreInitOptions,
@@ -20,13 +22,20 @@ const breadcrumbs = new BreadcrumbBuffer();
 let transport: ServerpodTransport | null = null;
 let release: string | undefined;
 let commitSha: string | undefined;
+let releaseRefKind: 'branch' | 'tag' | undefined;
 
 export function initEdge(options: CoreInitOptions): void {
   const baseUrl = (options.dsn || options.baseUrl || '').replace(/\/+$/, '');
   if (!baseUrl) throw new Error('@newtalaria/nextjs/edge: init requires dsn or baseUrl');
   transport = new ServerpodTransport({ baseUrl, apiKey: options.apiKey });
-  release = options.release;
-  commitSha = options.commitSha;
+  const identity = resolveReleaseIdentity({
+    release: options.release,
+    commitSha: options.commitSha,
+    env: readProcessReleaseEnv(),
+  });
+  release = identity.release;
+  commitSha = identity.commitSha;
+  releaseRefKind = identity.releaseRefKind;
   scope.clear();
   if (options.userId) scope.setUser({ id: options.userId });
   if (options.tags) scope.setTags(options.tags);
@@ -110,6 +119,7 @@ async function send(args: {
         platform: PLATFORM,
         release,
         commitSha,
+        releaseRefKind,
         userId: args.context?.userId ?? scope.getUserId(),
         extraJson: extra ? JSON.stringify(extra) : undefined,
         tags: Object.keys(tags).length ? tags : undefined,
