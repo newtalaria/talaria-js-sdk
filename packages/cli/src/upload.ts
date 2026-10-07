@@ -69,7 +69,7 @@ export async function uploadSourceMaps(
     }
     const raw = await readFile(file);
     const debugId = readDebugId(raw);
-    const gzipBytes = gzipSync(raw).toString('base64');
+    const gzipBytes = `decode('${gzipSync(raw).toString('base64')}', 'base64')`;
     const input: Record<string, unknown> = {
       __className__: 'UploadSourceMapInput',
       release,

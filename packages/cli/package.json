@@ -1,6 +1,6 @@
 {
   "name": "@newtalaria/cli",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Upload JavaScript source maps to Talaria for a release",
   "type": "module",
   "bin": {

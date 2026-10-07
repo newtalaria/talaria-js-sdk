@@ -69,9 +69,10 @@ describe('sourcemaps upload', () => {
     assert.equal(body.input.release, 'local');
     assert.equal(body.input.fileName, 'main.a1b2c3.js');
     assert.equal(body.input.debugId, 'debug-1');
-    const decoded = gunzipSync(Buffer.from(body.input.gzipBytes, 'base64')).toString(
-      'utf8',
-    );
+    const wrapped = body.input.gzipBytes;
+    assert.match(wrapped, /^decode\('[A-Za-z0-9+/=]+', 'base64'\)$/);
+    const b64 = wrapped.slice("decode('".length, -"', 'base64')".length);
+    const decoded = gunzipSync(Buffer.from(b64, 'base64')).toString('utf8');
     assert.equal(decoded, mapJson);
     assert.ok(logs.includes('http://localhost:8080 release local'));
     assert.ok(logs.includes('main.a1b2c3.js'));
