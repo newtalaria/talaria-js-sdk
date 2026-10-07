@@ -1,9 +1,12 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { access, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { ServerpodTransport, resolveReleaseIdentity } from '@newtalaria/core';
 
-const FILE_NAME = /^[A-Za-z0-9._~+-]+$/;
+const SEGMENT = /^[A-Za-z0-9._~+-]+$/;
+const SAFE_DEBUG_ID = /^[A-Za-z0-9._~+-]{1,80}$/;
+const DEBUG_COMMENT = /\/\/# debugId=([^\s]+)/;
 const LOCAL_URL = 'http://localhost:8080';
 
 export interface UploadSourceMapsOptions {
@@ -19,6 +22,7 @@ interface ParsedArgs {
   release?: string;
   url?: string;
   apiKey?: string;
+  silverstripeCombineFiles: boolean;
 }
 
 export async function uploadSourceMaps(
@@ -59,20 +63,27 @@ export async function uploadSourceMaps(
   }
 
   log(`${url} release ${release}`);
+  if (parsed.silverstripeCombineFiles) {
+    log('Silverstripe combine: shifted generated lines by the header comment');
+  }
   const transport = new ServerpodTransport({ baseUrl: url, apiKey });
   let failed = 0;
   for (const file of maps) {
-    const fileName = path.basename(file).replace(/\.map$/, '');
+    const prepared = await prepareArtifact(root, file);
+    const payload = parsed.silverstripeCombineFiles
+      ? shiftForSilverstripeCombine(prepared.json)
+      : prepared.json;
+    const fileName = prepared.fileName;
     log(fileName);
-    if (!FILE_NAME.test(fileName) || fileName.length > 200) {
+    if (!fileNameOk(fileName)) {
       error(
-        `${fileName}: file name must be the minified basename, such as main.js`,
+        `${fileName}: file name must be a served artifact path, such as static/js/main.js`,
       );
       failed += 1;
       continue;
     }
-    const raw = await readFile(file);
-    const debugId = readDebugId(raw);
+    const raw = Buffer.from(payload, 'utf8');
+    const debugId = prepared.debugId;
     const gzipBytes = `decode('${gzipSync(raw).toString('base64')}', 'base64')`;
     const input: Record<string, unknown> = {
       __className__: 'UploadSourceMapInput',
@@ -106,6 +117,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let release: string | undefined;
   let url: string | undefined;
   let apiKey: string | undefined;
+  let silverstripeCombineFiles = false;
   const positionals: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] ?? '';
@@ -115,6 +127,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       url = requireValue(args, ++i, '--url');
     } else if (arg === '--api-key') {
       apiKey = requireValue(args, ++i, '--api-key');
+    } else if (arg === '--silverstripe-combine-files') {
+      silverstripeCombineFiles = true;
     } else if (arg.startsWith('--')) {
       throw new Error(`Unknown flag ${arg}`);
     } else {
@@ -124,7 +138,23 @@ export function parseArgs(argv: string[]): ParsedArgs {
   if (positionals.length > 1) {
     throw new Error('Pass one directory of built source maps');
   }
-  return { path: positionals[0] ?? '.', release, url, apiKey };
+  return {
+    path: positionals[0] ?? '.',
+    release,
+    url,
+    apiKey,
+    silverstripeCombineFiles,
+  };
+}
+
+/** One empty generated line, matching Silverstripe's header before the first combined file. */
+function shiftForSilverstripeCombine(jsonText: string): string {
+  const parsed = parseMap(jsonText);
+  if (!parsed) return jsonText;
+  const mappings = parsed.mappings;
+  if (typeof mappings !== 'string' || mappings.length === 0) return jsonText;
+  parsed.mappings = `;${mappings}`;
+  return `${JSON.stringify(parsed)}\n`;
 }
 
 function requireValue(args: string[], index: number, flag: string): string {
@@ -160,17 +190,94 @@ async function walk(dir: string, out: string[]): Promise<void> {
   }
 }
 
-function readDebugId(raw: Buffer): string | undefined {
+function fileNameOk(name: string): boolean {
+  if (!name || name.length > 200 || name.includes('\\')) return false;
+  const parts = name.split('/');
+  return (
+    parts.length > 0 &&
+    parts.every((part) => part !== '.' && part !== '..' && SEGMENT.test(part))
+  );
+}
+
+interface PreparedArtifact {
+  fileName: string;
+  debugId?: string;
+  json: string;
+}
+
+async function prepareArtifact(
+  root: string,
+  mapPath: string,
+): Promise<PreparedArtifact> {
+  const jsonText = await readFile(mapPath, 'utf8');
+  const parsed = parseMap(jsonText);
+  const jsPath = mapPath.slice(0, -'.map'.length);
+  const sibling =
+    jsPath.endsWith('.js') && jsPath !== mapPath && (await exists(jsPath));
+  if (!sibling || !parsed) {
+    return {
+      fileName: path.basename(mapPath).replace(/\.map$/, ''),
+      debugId: debugIdOf(parsed),
+      json: jsonText,
+    };
+  }
+
+  let js = await readFile(jsPath, 'utf8');
+  const fromJs = safeDebugId(js.match(DEBUG_COMMENT)?.[1]);
+  const fromMap = safeDebugId(debugIdOf(parsed));
+  const debugId = fromJs || fromMap || randomUUID();
+  if (!fromJs) {
+    const body = js.endsWith('\n') ? js : `${js}\n`;
+    js = `${body}${debugIdSnippet(debugId)}\n`;
+    await writeFile(jsPath, js);
+  }
+  let json = jsonText;
+  if (fromMap !== debugId) {
+    parsed.debugId = debugId;
+    json = `${JSON.stringify(parsed)}\n`;
+    await writeFile(mapPath, json);
+  }
+  return {
+    fileName: path.relative(root, jsPath).split(path.sep).join('/'),
+    debugId,
+    json,
+  };
+}
+
+function debugIdSnippet(debugId: string): string {
+  return `;try{(function(id){var g=globalThis.__talariaDebugIds||(globalThis.__talariaDebugIds={});function put(url){if(!url)return;g[url]=id;var clean=String(url).split("?")[0].split("#")[0].replace(/:\\d+:\\d+$/,"");g[clean]=id;}try{if(typeof document!=="undefined"&&document.currentScript&&document.currentScript.src)put(document.currentScript.src);}catch(e){}try{var stack=(new Error).stack||"";var matches=stack.match(/https?:\\/\\/[^)\\s]+/g)||[];for(var i=0;i<matches.length;i++)put(matches[i]);}catch(e){}})("${debugId}")}catch(e){}\n//# debugId=${debugId}`;
+}
+
+function parseMap(jsonText: string): Record<string, unknown> | undefined {
   try {
-    const parsed = JSON.parse(raw.toString('utf8')) as unknown;
+    const parsed = JSON.parse(jsonText) as unknown;
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return undefined;
     }
-    const debugId = (parsed as { debugId?: unknown }).debugId;
-    if (typeof debugId !== 'string') return undefined;
-    const trimmed = debugId.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
+    return parsed as Record<string, unknown>;
   } catch {
     return undefined;
+  }
+}
+
+function safeDebugId(value: string | undefined): string | undefined {
+  if (!value || !SAFE_DEBUG_ID.test(value)) return undefined;
+  return value;
+}
+
+function debugIdOf(parsed: Record<string, unknown> | undefined): string | undefined {
+  if (!parsed) return undefined;
+  const value = parsed.debugId ?? parsed.debug_id;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+async function exists(file: string): Promise<boolean> {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
   }
 }

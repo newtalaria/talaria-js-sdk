@@ -41,6 +41,7 @@ import {
   resolvePageOrigin,
   type InAppFrameOptions,
 } from './utils/stacktrace.js';
+import { debugMetaForException } from './utils/debug_id.js';
 import { SDK_NAME, SDK_VERSION } from './sdk_meta.js';
 import { ServerpodTransport } from './transport/serverpod.js';
 import { IngestError } from './transport/ingest_error.js';
@@ -1845,6 +1846,7 @@ export class TalariaClient {
         title,
         stackTrace: args.stackTrace,
         exception,
+        debugMeta: debugMetaForException(exception),
         platform: args.platform,
         release: this.options.release,
         commitSha: this.options.commitSha,

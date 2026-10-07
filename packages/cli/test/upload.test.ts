@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -101,6 +101,142 @@ describe('sourcemaps upload', () => {
       assert.equal(called, false);
     } finally {
       globalThis.fetch = previous;
+    }
+  });
+
+  it('injects one debug id into the sibling script and uploads its path', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'talaria-maps-'));
+    const assets = path.join(root, 'dist', 'assets');
+    await mkdir(assets, { recursive: true });
+    const jsPath = path.join(assets, 'app.js');
+    const mapPath = path.join(assets, 'app.js.map');
+    await writeFile(jsPath, 'function a(){return 1}\n');
+    await writeFile(
+      mapPath,
+      JSON.stringify({
+        version: 3,
+        file: 'app.js',
+        sources: ['../src/app.ts'],
+        names: ['a'],
+        mappings: 'AAAAA',
+      }),
+    );
+
+    const requests: Array<{ init: RequestInit }> = [];
+    const previous = globalThis.fetch;
+    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ init: init ?? {} });
+      return new Response(
+        JSON.stringify({
+          id: 'map-1',
+          release: 'local',
+          fileName: 'assets/app.js',
+          sizeBytes: 1,
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    try {
+      const first = await uploadSourceMaps({
+        cwd: root,
+        argv: ['sourcemaps', 'upload', 'dist'],
+        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        log: () => {},
+        error: () => {},
+      });
+      const second = await uploadSourceMaps({
+        cwd: root,
+        argv: ['sourcemaps', 'upload', 'dist'],
+        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        log: () => {},
+        error: () => {},
+      });
+      assert.equal(first, 0);
+      assert.equal(second, 0);
+    } finally {
+      globalThis.fetch = previous;
+    }
+
+    const js = await readFile(jsPath, 'utf8');
+    const matches = js.match(/\/\/# debugId=([^\s]+)/g) ?? [];
+    assert.equal(matches.length, 1);
+    assert.match(js, /__talariaDebugIds/);
+    const map = JSON.parse(await readFile(mapPath, 'utf8')) as { debugId?: string };
+    assert.equal(map.debugId, matches[0]!.replace('//# debugId=', ''));
+
+    const body = JSON.parse(String(requests[0]!.init.body)) as {
+      input: { fileName: string; debugId?: string };
+    };
+    assert.equal(body.input.fileName, 'assets/app.js');
+    assert.equal(body.input.debugId, map.debugId);
+    const again = JSON.parse(String(requests[1]!.init.body)) as {
+      input: { debugId?: string };
+    };
+    assert.equal(again.input.debugId, map.debugId);
+  });
+
+  it('shifts generated lines by one when Silverstripe combines the first file', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'talaria-maps-'));
+    const dir = path.join(root, 'source-maps');
+    await mkdir(dir, { recursive: true });
+    const jsPath = path.join(dir, 'scripts.js');
+    const mapPath = path.join(dir, 'scripts.js.map');
+    await writeFile(jsPath, 'function a(){return 1}\n');
+    const original = {
+      version: 3,
+      file: 'scripts.js',
+      sources: ['../src/app.js'],
+      names: ['a'],
+      mappings: 'AAAA',
+    };
+    await writeFile(mapPath, `${JSON.stringify(original)}\n`);
+
+    const requests: Array<{ init: RequestInit }> = [];
+    const previous = globalThis.fetch;
+    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ init: init ?? {} });
+      return new Response(
+        JSON.stringify({ id: 'map-1', release: 'local', fileName: 'scripts.js', sizeBytes: 1 }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    const logs: string[] = [];
+    try {
+      const first = await uploadSourceMaps({
+        cwd: root,
+        argv: ['sourcemaps', 'upload', 'source-maps', '--silverstripe-combine-files'],
+        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        log: (line) => logs.push(line),
+        error: () => {},
+      });
+      const second = await uploadSourceMaps({
+        cwd: root,
+        argv: ['sourcemaps', 'upload', 'source-maps', '--silverstripe-combine-files'],
+        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        log: () => {},
+        error: () => {},
+      });
+      assert.equal(first, 0);
+      assert.equal(second, 0);
+    } finally {
+      globalThis.fetch = previous;
+    }
+
+    assert.ok(logs.some((line) => line.includes('Silverstripe combine')));
+    const onDisk = JSON.parse(await readFile(mapPath, 'utf8')) as { mappings: string };
+    assert.equal(onDisk.mappings, 'AAAA');
+    for (const request of requests) {
+      const body = JSON.parse(String(request.init.body)) as {
+        input: { gzipBytes: string };
+      };
+      const wrapped = body.input.gzipBytes;
+      const b64 = wrapped.slice("decode('".length, -"', 'base64')".length);
+      const uploaded = JSON.parse(gunzipSync(Buffer.from(b64, 'base64')).toString('utf8')) as {
+        mappings: string;
+      };
+      assert.equal(uploaded.mappings, ';AAAA');
     }
   });
 });
