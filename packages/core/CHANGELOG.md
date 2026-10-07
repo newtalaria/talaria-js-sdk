@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.5
+
+- Resolve a release from GitHub Actions or GitLab when `TALARIA_RELEASE` is unset. The source map CLI uses this.
+
 ## 0.5.4
 
 - Release aligned with `@newtalaria/node` 0.5.4. No API changes.
