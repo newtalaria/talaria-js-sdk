@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased (proposed 0.5.6)
+
+- Event titles are `<Type>: <message>` (truncated to 120 characters) instead of the bare exception type, for errors and synthetic network errors.
+- A rejected `replays/start` no longer re-throws from fire-and-forget upload tasks, so it is not captured as a `TransportError` issue; the next flush retries.
+
 ## 0.5.4
 
 - Release aligned with `@newtalaria/node` 0.5.4. No API changes.

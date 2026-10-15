@@ -1,7 +1,7 @@
 {
   "name": "@newtalaria/nextjs",
   "version": "0.5.4",
-  "description": "Talaria SDK for Next.js — client, server, and edge entrypoints",
+  "description": "Talaria SDK for Next.js \u2014 client, server, and edge entrypoints",
   "type": "module",
   "main": "./dist/client/index.js",
   "types": "./dist/client/index.d.ts",
@@ -47,9 +47,10 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@newtalaria/core": "^0.5.4",
+    "@newtalaria/core": "^0.5.5",
     "@newtalaria/node": "^0.5.4",
-    "@newtalaria/react": "^0.5.4"
+    "@newtalaria/react": "^0.5.4",
+    "@newtalaria/cli": "^0.5.6"
   },
   "peerDependencies": {
     "next": "^14.0.0 || ^15.0.0 || ^16.0.0",
@@ -78,5 +79,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "bin": {
+    "talaria-nextjs": "./dist/cli.js"
   }
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased (proposed 0.6.0)
+
+- `withTalariaConfig` tags every event with the release and commit (from options, `TALARIA_RELEASE`, Vercel/GitHub/GitLab/Cloudflare/Render/Netlify/Heroku/Bitbucket/CircleCI env, or git).
+- After `next build` (`compiler.runAfterProductionCompile`), with `TALARIA_RELEASE_KEY` set: `releases/setCommits` creates the release with commits `previousReleaseCommitSha..HEAD` (max 250); `.next/static` maps are uploaded as `_next/static/...`, verified with `sourceMaps/list`, then the public `.map` files are deleted. `createProjectRelease` (without `projectId`) is only a fallback for servers without setCommits.
+- New `talaria-nextjs upload` CLI for the same step at deploy time.
+- Adds an empty `turbopack` config so Next 16 builds with Turbopack accept the wrapper.
+
 ## 0.5.4
 
 - Depends on `@newtalaria/node` ^0.5.4 (`wrapDuckDB`, database wrappers split by driver).

@@ -54,7 +54,31 @@ export function resolveReleaseIdentity(input: {
 /** Reads inlined `process.env` when a bundler left it on `globalThis`. */
 export function readProcessReleaseEnv(): ReleaseEnv {
   const proc = (globalThis as { process?: { env?: ReleaseEnv } }).process;
-  return proc?.env ?? {};
+  return { ...inlinedReleaseEnv(), ...(proc?.env ?? {}) };
+}
+
+declare const process: { env: Record<string, string | undefined> } | undefined;
+
+/**
+ * Literal `process.env.NEXT_PUBLIC_*` reads, so bundlers that inline public env vars (Next.js,
+ * and `withTalariaConfig`, which sets these at build time) tag browser events with the release
+ * and commit even where `globalThis.process` does not exist.
+ */
+function inlinedReleaseEnv(): ReleaseEnv {
+  const out: ReleaseEnv = {};
+  try {
+    const release = process!.env.NEXT_PUBLIC_TALARIA_RELEASE;
+    if (release) out.NEXT_PUBLIC_TALARIA_RELEASE = release;
+  } catch {
+    // not inlined and no process
+  }
+  try {
+    const sha = process!.env.NEXT_PUBLIC_TALARIA_COMMIT_SHA;
+    if (sha) out.NEXT_PUBLIC_TALARIA_COMMIT_SHA = sha;
+  } catch {
+    // not inlined and no process
+  }
+  return out;
 }
 
 function fromCi(env: ReleaseEnv): ReleaseIdentity {
