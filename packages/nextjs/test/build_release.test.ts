@@ -48,37 +48,77 @@ async function fakeBuild() {
 }
 
 describe('finalizeTalariaRelease', () => {
-  it('creates the release, reports missing setCommits, uploads _next/static paths and deletes maps', async () => {
+  it('probes setCommits for the previous release, sends previous..HEAD, uploads _next/static paths, verifies via sourceMaps/list, deletes maps', async () => {
     const { dir, chunks } = await fakeBuild();
-    const calls: string[] = [];
-    const transport = { call: async (endpoint: string, method: string) => {
-      calls.push(`${endpoint}/${method}`);
-      if (method === 'setCommits') throw Object.assign(new Error('Talaria releases/setCommits failed: HTTP 404'), { status: 404 });
+    const PREV = 'c'.repeat(40);
+    const calls: Array<{ path: string; params: Record<string, any> }> = [];
+    const transport = { call: async (endpoint: string, method: string, params: Record<string, any>) => {
+      calls.push({ path: `${endpoint}/${method}`, params });
+      if (method === 'setCommits') return { version: params.input.version, commitSha: params.input.commitSha, commitCount: params.input.commits.length, previousReleaseVersion: 'main@ccccccc', previousReleaseCommitSha: PREV };
+      if (method === 'list') return { items: [{ fileName: '_next/static/chunks/main-1a.js', release: 'main@aaaaaaa' }], pagination: { totalPages: 1 } };
       return {};
     } };
+    const commits = [
+      { id: SHA, authorName: 'a', authorEmail: 'a@x', timestamp: '2026-10-15T00:00:00Z', message: 'head' },
+      { id: 'd'.repeat(40), authorName: 'b', authorEmail: 'b@x', timestamp: '2026-10-14T00:00:00Z', message: 'older' },
+    ];
     const uploaded: string[] = [];
     const prev = globalThis.fetch;
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
-      uploaded.push(`${String(url)} ${(JSON.parse(String(init?.body)) as { input: { fileName: string; release: string } }).input.fileName}`);
+      uploaded.push(`${String(url)} ${(JSON.parse(String(init?.body)) as { input: { fileName: string } }).input.fileName}`);
       return new Response('{"id":"m1"}', { status: 200, headers: { 'content-type': 'application/json' } });
     }) as typeof fetch;
+    let r;
     try {
-      const r = await finalizeTalariaRelease({
-        projectDir: dir, release: 'main@aaaaaaa', commitSha: SHA, url: 'http://localhost:8180', apiKey: 'tal_live_rw', projectId: 'p1',
-        env: {}, transport, commits: [{ id: SHA, authorName: 'a', authorEmail: 'a@x', timestamp: 't', message: 'm' }], log: () => {}, error: () => {},
-      });
-      assert.equal(r.releaseCreated, true);
-      assert.equal(r.commitsSupported, false);
-      assert.equal(r.mapsUploaded, true);
-      assert.equal(r.mapsUploadedCount, 1);
+      r = await finalizeTalariaRelease({ projectDir: dir, release: 'main@aaaaaaa', commitSha: SHA, url: 'http://localhost:8180', apiKey: 'tal_live_rw', env: {}, transport, commits, log: () => {}, error: () => {} });
     } finally {
       globalThis.fetch = prev;
     }
-    assert.deepEqual(calls, ['source/createProjectRelease', 'releases/setCommits']);
+    assert.deepEqual(calls.map((c) => c.path), ['releases/setCommits', 'releases/setCommits', 'sourceMaps/list']);
+    const [probe, fullCall] = calls;
+    assert.equal(probe!.params.input.previousCommitSha, null);
+    assert.deepEqual(probe!.params.input.commits.map((c: any) => c.id), [SHA]);
+    assert.equal(fullCall!.params.input.previousCommitSha, PREV);
+    assert.equal(fullCall!.params.input.commits.length, 2);
+    assert.equal(fullCall!.params.input.commits[0].__className__, 'ReleaseCommitInput');
+    assert.equal(fullCall!.params.input.__className__, 'SetReleaseCommitsInput');
+    assert.deepEqual(calls[2]!.params, { release: 'main@aaaaaaa', page: 1, pageSize: 100 });
+    assert.equal(r.releaseCreated, true);
+    assert.equal(r.commitsSent, 2);
+    assert.equal(r.previousReleaseCommitSha, PREV);
+    assert.equal(r.mapsVerified, 1);
     assert.deepEqual(uploaded, ['http://localhost:8180/sourceMaps/upload _next/static/chunks/main-1a.js']);
     assert.deepEqual(await readdir(chunks), ['main-1a.js']);
     assert.deepEqual(await readdir(path.join(dir, '.next', 'static', 'css')), []);
     assert.equal((await readFile(path.join(chunks, 'main-1a.js'), 'utf8')).includes('sourceMappingURL'), false);
+  });
+  it('uses TALARIA_PREVIOUS_COMMIT_SHA without a probe, and falls back to createProjectRelease (no projectId) on an old server', async () => {
+    const { dir } = await fakeBuild();
+    const calls: Array<{ path: string; params: Record<string, any> }> = [];
+    let hasSetCommits = true;
+    const transport = { call: async (endpoint: string, method: string, params: Record<string, any>) => {
+      calls.push({ path: `${endpoint}/${method}`, params });
+      if (method === 'setCommits' && !hasSetCommits) throw Object.assign(new Error('HTTP 404'), { status: 404 });
+      if (method === 'setCommits') return { commitCount: params.input.commits.length, previousReleaseCommitSha: params.input.previousCommitSha };
+      return { items: [] };
+    } };
+    const prev = globalThis.fetch;
+    globalThis.fetch = (async () => new Response('{"id":"m"}', { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+    try {
+      const commits = [{ id: SHA, authorName: 'a', authorEmail: 'a@x', timestamp: 't', message: 'm' }];
+      await finalizeTalariaRelease({ projectDir: dir, release: 'r', commitSha: SHA, apiKey: 'k', env: { TALARIA_PREVIOUS_COMMIT_SHA: 'e'.repeat(40) }, transport, commits, deleteSourceMaps: false, log: () => {}, error: () => {} });
+      assert.deepEqual(calls.filter((c) => c.path === 'releases/setCommits').length, 1);
+      assert.equal(calls[0]!.params.input.previousCommitSha, 'e'.repeat(40));
+      calls.length = 0;
+      hasSetCommits = false;
+      const r = await finalizeTalariaRelease({ projectDir: dir, release: 'r', commitSha: SHA, apiKey: 'k', env: {}, transport, commits, log: () => {}, error: () => {} });
+      const create = calls.find((c) => c.path === 'source/createProjectRelease');
+      assert.ok(create && !('projectId' in create.params));
+      assert.equal(r.commitsSupported, false);
+      assert.equal(r.releaseCreated, true);
+    } finally {
+      globalThis.fetch = prev;
+    }
   });
   it('skips without a releases:write key but still hides maps', async () => {
     const { dir, chunks } = await fakeBuild();

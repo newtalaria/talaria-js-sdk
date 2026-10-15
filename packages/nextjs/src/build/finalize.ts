@@ -4,6 +4,9 @@ import { ServerpodTransport } from '@newtalaria/core';
 import { hideMap, mapOwners, uploadSourceMaps } from '@newtalaria/cli';
 import { collectCommits, resolveBuildRelease, type ReleaseCommit } from './release.js';
 
+const MAX_COMMITS = 250;
+const FULL_SHA = /^[0-9a-f]{40}$/i;
+
 type Env = Record<string, string | undefined>;
 type Transport = Pick<ServerpodTransport, 'call'>;
 
@@ -40,10 +43,13 @@ export interface FinalizeResult {
   commitSha?: string;
   releaseCreated: boolean;
   commitsSent: number;
-  /** false when the server has no releases.setCommits yet (SDK-RELEASE-API.md). */
+  /** false when the server has no releases/setCommits (older server); release then comes from createProjectRelease. */
   commitsSupported: boolean;
   mapsUploaded: boolean;
   mapsUploadedCount?: number;
+  /** Uploaded maps the server lists for the release (sourceMaps/list); undefined if listing failed. */
+  mapsVerified?: number;
+  previousReleaseCommitSha?: string | null;
   mapsHidden: number;
 }
 
@@ -82,41 +88,11 @@ export async function finalizeTalariaRelease(options: FinalizeOptions): Promise<
   const release = identity.release!;
   const url = options.url ?? env.TALARIA_BASE_URL ?? env.NEXT_PUBLIC_TALARIA_DSN ?? 'http://localhost:8080';
   const transport = options.transport ?? new ServerpodTransport({ baseUrl: url, apiKey: apiKey! });
-  const projectId = options.projectId ?? env.TALARIA_PROJECT_ID;
+  const projectId = options.projectId ?? env.TALARIA_PROJECT_ID; // optional: the key names the project
   log(`release ${release}${identity.commitSha ? ` (${identity.commitSha.slice(0, 12)}, from ${identity.source})` : ''} -> ${url}`);
 
   if (identity.commitSha) {
-    if (projectId) {
-      try {
-        await transport.call('source', 'createProjectRelease', {
-          projectId,
-          input: { __className__: 'CreateProjectReleaseInput', version: release, commitSha: identity.commitSha },
-        });
-        result.releaseCreated = true;
-        log('release created');
-      } catch (err) {
-        error(`release create failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    } else {
-      error('release create skipped: set TALARIA_PROJECT_ID (the server needs it; see SDK-RELEASE-API.md)');
-    }
-    const commits = options.commits ?? collectCommits({ commitSha: identity.commitSha, previousCommitSha: options.previousCommitSha ?? env.TALARIA_PREVIOUS_COMMIT_SHA, limit: options.commitLimit, cwd: options.projectDir });
-    if (commits.length) {
-      try {
-        await transport.call('releases', 'setCommits', {
-          input: { __className__: 'SetReleaseCommitsInput', version: release, commitSha: identity.commitSha, previousCommitSha: options.previousCommitSha ?? env.TALARIA_PREVIOUS_COMMIT_SHA ?? null, commits },
-        });
-        result.commitsSent = commits.length;
-        log(`${commits.length} commits attached`);
-      } catch (err) {
-        if (isMissingEndpoint(err)) {
-          result.commitsSupported = false;
-          error('commits not attached: the server has no releases/setCommits yet (SDK-RELEASE-API.md)');
-        } else {
-          error(`commits not attached: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-    }
+    await attachRelease({ transport, release, commitSha: identity.commitSha, projectId, options, env, result, log, error });
   }
 
   const lines: string[] = [];
@@ -131,6 +107,9 @@ export async function finalizeTalariaRelease(options: FinalizeOptions): Promise<
   const uploaded = lines.filter((l) => l.startsWith('_next/static/') && l.includes(' ')).length;
   result.mapsUploadedCount = uploaded;
   log(`${uploaded} source maps uploaded${code === 0 ? '' : ' (some failed)'}`);
+  const expected = lines.filter((l) => l.includes(' ') && !l.startsWith('http')).map((l) => l.split(' ')[0]!);
+  result.mapsVerified = await verifyUpload(transport, release, expected, error);
+  if (result.mapsVerified !== undefined) log(`server lists ${result.mapsVerified}/${expected.length} uploaded maps for ${release}`);
   // Anything the upload left behind (failed uploads, CSS maps) must not be served either.
   if (deleteMaps) result.mapsHidden = await hideAllMaps(staticDir);
   return result;
@@ -165,4 +144,89 @@ async function stripCssMapComment(file: string): Promise<void> {
   const css = await readFile(file, 'utf8');
   const stripped = css.replace(CSS_MAP_COMMENT, '');
   if (stripped !== css) await writeFile(file, stripped);
+}
+
+interface SetCommitsResponse {
+  version?: string;
+  commitSha?: string;
+  commitCount?: number;
+  previousReleaseVersion?: string | null;
+  previousReleaseCommitSha?: string | null;
+}
+
+/**
+ * releases/setCommits creates the release and replaces its commits. The range is
+ * previousReleaseCommitSha..HEAD: the first call (HEAD only) returns the previous release's SHA,
+ * then the full range is sent. TALARIA_PREVIOUS_COMMIT_SHA skips the probe. On an older server
+ * without setCommits, falls back to source/createProjectRelease (projectId optional with a key).
+ */
+async function attachRelease(a: {
+  transport: Transport; release: string; commitSha: string; projectId?: string; options: FinalizeOptions;
+  env: Env; result: FinalizeResult; log: (l: string) => void; error: (l: string) => void;
+}): Promise<void> {
+  const { transport, release, commitSha, options, env, result, log, error } = a;
+  const full = FULL_SHA.test(commitSha) ? commitSha : undefined;
+  const all = (prev?: string) =>
+    (options.commits ?? collectCommits({ commitSha, previousCommitSha: prev, limit: options.commitLimit ?? MAX_COMMITS, cwd: options.projectDir }))
+      .filter((c) => FULL_SHA.test(c.id))
+      .slice(0, MAX_COMMITS);
+  const send = async (commits: ReleaseCommit[], previous: string | null) =>
+    (await transport.call('releases', 'setCommits', {
+      input: {
+        __className__: 'SetReleaseCommitsInput', version: release, commitSha: full, previousCommitSha: previous,
+        commits: commits.map((c) => ({ __className__: 'ReleaseCommitInput', ...c })),
+      },
+    })) as SetCommitsResponse | undefined;
+  if (full) {
+    try {
+      let previous = options.previousCommitSha ?? env.TALARIA_PREVIOUS_COMMIT_SHA ?? null;
+      let response: SetCommitsResponse | undefined;
+      if (!previous) {
+        const head = all().filter((c) => c.id === full);
+        response = await send(head, null);
+        previous = response?.previousReleaseCommitSha ?? null;
+      }
+      const commits = all(previous && previous !== full ? previous : undefined);
+      if (!response || commits.length > 1) response = await send(commits, previous);
+      result.releaseCreated = true;
+      result.commitsSent = response?.commitCount ?? commits.length;
+      result.previousReleaseCommitSha = response?.previousReleaseCommitSha ?? previous;
+      log(`release created with ${result.commitsSent} commits${previous ? ` since ${previous.slice(0, 7)}` : ''}`);
+      return;
+    } catch (err) {
+      if (!isMissingEndpoint(err)) {
+        error(`releases/setCommits failed: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+      result.commitsSupported = false;
+      error('server has no releases/setCommits; creating the release without commits');
+    }
+  }
+  try {
+    await transport.call('source', 'createProjectRelease', {
+      ...(a.projectId ? { projectId: a.projectId } : {}),
+      input: { __className__: 'CreateProjectReleaseInput', version: release, commitSha },
+    });
+    result.releaseCreated = true;
+    log('release created');
+  } catch (err) {
+    error(`release create failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/** sourceMaps/list for the release (key-scoped); counts how many uploaded names the server has. */
+async function verifyUpload(transport: Transport, release: string, expected: string[], error: (l: string) => void): Promise<number | undefined> {
+  if (!expected.length) return 0;
+  const seen = new Set<string>();
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const res = (await transport.call('sourceMaps', 'list', { release, page, pageSize: 100 })) as { items?: Array<{ fileName?: string; release?: string }>; pagination?: { totalPages?: number } } | undefined;
+      for (const item of res?.items ?? []) if (item.fileName && (item.release ?? release) === release) seen.add(item.fileName);
+      if (!res?.items?.length || page >= (res.pagination?.totalPages ?? 1)) break;
+    }
+  } catch (err) {
+    error(`could not verify the upload (sourceMaps/list): ${err instanceof Error ? err.message : String(err)}`);
+    return undefined;
+  }
+  return expected.filter((n) => seen.has(n)).length;
 }

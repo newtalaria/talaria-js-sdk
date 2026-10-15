@@ -68,10 +68,10 @@ export default withTalariaConfig({ /* your config */ });
 ```
 
 - **Release tagging:** the release is `TALARIA_RELEASE`, or `<branch>@<sha7>`. The SHA comes from `VERCEL_GIT_COMMIT_SHA`, `GITHUB_SHA`, `CI_COMMIT_SHA`, `CF_PAGES_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `COMMIT_REF`, `SOURCE_VERSION`, `BITBUCKET_COMMIT` or `CIRCLE_SHA1`, else `git rev-parse HEAD`. Both values are inlined as `NEXT_PUBLIC_TALARIA_RELEASE` and `NEXT_PUBLIC_TALARIA_COMMIT_SHA`, so every event is tagged. Leave `release` out of `Talaria.init`, or set it to the same value.
-- **Upload at build time:** set `TALARIA_RELEASE_KEY` (a `releases:write` key, never the browser key), `TALARIA_BASE_URL` and `TALARIA_PROJECT_ID`. After `next build` compiles (Next 15.4+), the plugin:
-  1. creates the release;
-  2. attaches its commits (`TALARIA_PREVIOUS_COMMIT_SHA` sets the range start);
-  3. uploads `.next/static` source maps under their served paths (`_next/static/...`);
+- **Upload at build time:** set `TALARIA_RELEASE_KEY` (a `releases:write` key, never the browser key) and `TALARIA_BASE_URL`. The key names the project, so `TALARIA_PROJECT_ID` is optional. After `next build` compiles (Next 15.4+), the plugin:
+  1. creates the release with its commits through `releases/setCommits`. The range is the previous release's commit up to HEAD (at most 250 commits); the server reports the previous commit, or `TALARIA_PREVIOUS_COMMIT_SHA` sets it;
+  2. uploads `.next/static` source maps under their served paths (`_next/static/...`);
+  3. checks the upload with `sourceMaps/list`;
   4. deletes the `.map` files and their `sourceMappingURL` comments.
 
   A failed upload never fails the build.

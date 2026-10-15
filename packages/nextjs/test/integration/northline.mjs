@@ -27,18 +27,29 @@ const check = (ok, msg) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${msg}`); if (
 
 // 1. Stub Talaria unless a real one is given.
 const calls = [];
+const stored = [];
+let STUB_PREVIOUS = null; // set to the first commit of the temp repo below
 let server;
 let baseUrl = process.env.TALARIA_BASE_URL;
-const apiKey = process.env.TALARIA_RELEASE_KEY ?? 'tal_live_stub_releases_write';
-const projectId = process.env.TALARIA_PROJECT_ID ?? '00000000-0000-4000-8000-000000000001';
+// Real stack: NORTHLINE_SEED_CMD (e.g. `dart run bin/seed_demo.dart --key-only --json`) prints
+// releaseKey + projectId (new_talaria #38); no reseed happens with --key-only.
+let seed = {};
+if (process.env.NORTHLINE_SEED_CMD) seed = JSON.parse(execFileSync('bash', ['-c', process.env.NORTHLINE_SEED_CMD], { encoding: 'utf8' }));
+const apiKey = process.env.TALARIA_RELEASE_KEY ?? seed.releaseKey ?? 'tal_live_stub_releases_write';
+const projectId = process.env.TALARIA_PROJECT_ID ?? seed.projectId; // optional since #38
 if (!baseUrl) {
   server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (d) => (body += d)).on('end', () => {
       const json = body ? JSON.parse(body) : {};
       calls.push({ path: req.url, key: req.headers['x-api-key'], body: json });
+      // Shapes from new_talaria #38: setCommits creates the release and reports the previous one.
+      let reply = { id: 'r1' };
+      if (req.url === '/sourceMaps/upload') { stored.push(json.input); reply = { id: `m${calls.length}`, release: json.input.release, fileName: json.input.fileName, sizeBytes: 1 }; }
+      if (req.url === '/releases/setCommits') reply = { __className__: 'SetReleaseCommitsResponse', version: json.input.version, commitSha: json.input.commitSha, commitCount: json.input.commits.length, previousReleaseVersion: 'integration@0000000', previousReleaseCommitSha: STUB_PREVIOUS };
+      if (req.url === '/sourceMaps/list') { const items = stored.filter((m) => m.release === json.release).map((m) => ({ fileName: m.fileName, release: m.release })); reply = { items, pagination: { page: 1, pageSize: json.pageSize, totalPages: 1, total: items.length } }; }
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(req.url === '/sourceMaps/upload' ? { id: `m${calls.length}`, release: json.input.release, fileName: json.input.fileName, sizeBytes: 1 } : { id: 'r1' }));
+      res.end(JSON.stringify(reply));
     });
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -52,13 +63,19 @@ cpSync(app, dest, { recursive: true, filter: (src) => !/\/(node_modules|\.next|t
 const cfgName = readdirSync(dest).find((f) => /^next\.config\.(ts|mjs|js)$/.test(f));
 const ext = path.extname(cfgName);
 cpSync(path.join(dest, cfgName), path.join(dest, `next.config.base${ext}`));
-writeFileSync(path.join(dest, cfgName), `import { withTalariaConfig } from "@newtalaria/nextjs/config";\nimport base from "./next.config.base";\nexport default withTalariaConfig(base, { upload: { url: ${JSON.stringify(baseUrl)}, projectId: ${JSON.stringify(projectId)} } });\n`);
+writeFileSync(path.join(dest, cfgName), `import { withTalariaConfig } from "@newtalaria/nextjs/config";\nimport base from "./next.config.base";\nexport default withTalariaConfig(base, { upload: { url: ${JSON.stringify(baseUrl)}${projectId ? `, projectId: ${JSON.stringify(projectId)}` : ''} } });\n`);
 // Let the plugin tag events: drop the app's pinned release/commit so the SDK reads the inlined env.
 const talariaTs = path.join(dest, 'src/lib/talaria.ts');
 if (existsSync(talariaTs)) writeFileSync(talariaTs, readFileSync(talariaTs, 'utf8').replace(/^\s*release: RELEASE,\n/m, '').replace(/^\s*commitSha: process\.env\.NEXT_PUBLIC_COMMIT_SHA[^\n]*\n/m, ''));
 sh('git', ['init', '-q', '-b', 'integration'], work);
 sh('git', ['-c', 'user.name=Talaria CI', '-c', 'user.email=ci@talaria.test', 'add', '-A'], work);
 sh('git', ['-c', 'user.name=Talaria CI', '-c', 'user.email=ci@talaria.test', 'commit', '-qm', 'Northline build for the plugin integration test'], work);
+STUB_PREVIOUS = sh('git', ['rev-parse', 'HEAD'], work).trim();
+writeFileSync(path.join(dest, 'RELEASE_NOTE.md'), 'Plugin integration build.\n');
+sh('git', ['-c', 'user.name=Talaria CI', '-c', 'user.email=ci@talaria.test', 'add', '-A'], work);
+sh('git', ['-c', 'user.name=Talaria CI', '-c', 'user.email=ci@talaria.test', 'commit', '-qm', 'Second commit in the release'], work);
+writeFileSync(path.join(dest, 'RELEASE_NOTE.md'), 'Plugin integration build, take two.\n');
+sh('git', ['-c', 'user.name=Talaria CI', '-c', 'user.email=ci@talaria.test', 'commit', '-qam', 'Third commit in the release'], work);
 const head = sh('git', ['rev-parse', 'HEAD'], work).trim();
 
 // 3. Install the app, then this monorepo's packages (packed, so it matches a real install).
@@ -106,9 +123,12 @@ check(withComment.length === 0, `no sourceMappingURL comments left${withComment.
 // 6. Upload calls (stub) or the build log (real stack).
 if (server) {
   const uploads = calls.filter((c) => c.path === '/sourceMaps/upload');
-  check(calls.some((c) => c.path === '/source/createProjectRelease' && c.body.input.version === release && c.body.input.commitSha === head && c.body.projectId === projectId), 'release created with version + commitSha');
-  const setCommits = calls.find((c) => c.path === '/releases/setCommits');
-  check(setCommits?.body.input.commits?.[0]?.id === head, 'commits attached (releases/setCommits, SDK-RELEASE-API.md)');
+  const sets = calls.filter((c) => c.path === '/releases/setCommits');
+  check(sets.length === 2 && sets[0].body.input.previousCommitSha === null && sets[0].body.input.commits.map((c) => c.id).join() === head, 'setCommits probe sends HEAD only and learns the previous release');
+  const last = sets.at(-1)?.body.input;
+  check(last?.version === release && last.commitSha === head && last.previousCommitSha === STUB_PREVIOUS && last.commits.length === 2 && last.commits[0].id === head && !last.commits.some((c) => c.id === STUB_PREVIOUS) && last.commits[0].__className__ === 'ReleaseCommitInput', 'setCommits sends previousReleaseCommitSha..HEAD (2 commits) with a 40-hex commitSha');
+  check(!calls.some((c) => c.path === '/source/createProjectRelease'), 'createProjectRelease skipped (setCommits creates the release)');
+  check(calls.some((c) => c.path === '/sourceMaps/list' && c.body.release === release) && /server lists (\d+)\/\1 uploaded maps/.test(out), 'upload verified with sourceMaps/list');
   const served = uploads.filter((u) => u.body.input.fileName.startsWith('_next/static/'));
   check(served.length > 0 && uploads.every((u) => u.body.input.release === release), `${uploads.length} maps uploaded for ${release}: ${served.length} as _next/static/..., ${uploads.length - served.length} unreferenced by basename`);
   check(calls.every((c) => c.key === apiKey), 'every call used the releases:write key');
@@ -119,6 +139,8 @@ if (server) {
   server.close();
 } else {
   check(/source maps uploaded/.test(out) && !/some failed/.test(out), 'maps uploaded to the real stack');
+  check(/release created with \d+ commits/.test(out), 'release created by releases/setCommits');
+  check(/server lists (\d+)\/\1 uploaded maps/.test(out), 'sourceMaps/list lists every uploaded map');
 }
 
 if (!process.env.KEEP_WORK) rmSync(work, { recursive: true, force: true });
