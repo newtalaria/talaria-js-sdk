@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased (proposed 0.6.0)
+
+- `withTalariaConfig` tags every event with the release and commit (from options, `TALARIA_RELEASE`, Vercel/GitHub/GitLab/Cloudflare/Render/Netlify/Heroku/Bitbucket/CircleCI env, or git).
+- After `next build` (`compiler.runAfterProductionCompile`), with `TALARIA_RELEASE_KEY` set: creates the release, attaches commits (`releases/setCommits`, see SDK-RELEASE-API.md), uploads `.next/static` maps as `_next/static/...`, then deletes public `.map` files.
+- New `talaria-nextjs upload` CLI for the same step at deploy time.
+- Adds an empty `turbopack` config so Next 16 builds with Turbopack accept the wrapper.
+
 ## 0.5.4
 
 - Depends on `@newtalaria/node` ^0.5.4 (`wrapDuckDB`, database wrappers split by driver).

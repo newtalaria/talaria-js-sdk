@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (proposed 0.5.6)
+
+- `readProcessReleaseEnv` also reads literal `process.env.NEXT_PUBLIC_TALARIA_RELEASE` / `NEXT_PUBLIC_TALARIA_COMMIT_SHA`, so bundler-inlined values tag browser events.
+
 ## 0.5.5
 
 - Resolve a release from GitHub Actions or GitLab when `TALARIA_RELEASE` is unset. The source map CLI uses this.

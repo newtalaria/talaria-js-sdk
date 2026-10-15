@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { access, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { ServerpodTransport, resolveReleaseIdentity } from '@newtalaria/core';
@@ -23,6 +23,10 @@ interface ParsedArgs {
   url?: string;
   apiKey?: string;
   silverstripeCombineFiles: boolean;
+  /** Prefix for uploaded artifact paths, e.g. `_next/static` for a Next.js `.next/static` dir. */
+  urlPrefix?: string;
+  /** Delete each uploaded `.map` and strip its `sourceMappingURL` comment so maps are not served. */
+  deleteAfterUpload: boolean;
 }
 
 export async function uploadSourceMaps(
@@ -66,14 +70,17 @@ export async function uploadSourceMaps(
   if (parsed.silverstripeCombineFiles) {
     log('Silverstripe combine: shifted generated lines by the header comment');
   }
+  // Bundlers such as Turbopack name maps differently from their chunks (a.js -> b.js.map), so
+  // pair each map with the JavaScript file whose sourceMappingURL points at it.
+  const owners = await mapOwners(root);
   const transport = new ServerpodTransport({ baseUrl: url, apiKey });
   let failed = 0;
   for (const file of maps) {
-    const prepared = await prepareArtifact(root, file);
+    const prepared = await prepareArtifact(root, file, owners.get(file));
     const payload = parsed.silverstripeCombineFiles
       ? shiftForSilverstripeCombine(prepared.json)
       : prepared.json;
-    const fileName = prepared.fileName;
+    const fileName = prepared.orphan ? prepared.fileName : withPrefix(parsed.urlPrefix, prepared.fileName);
     log(fileName);
     if (!fileNameOk(fileName)) {
       error(
@@ -99,6 +106,7 @@ export async function uploadSourceMaps(
           ? String((result as { id: unknown }).id)
           : '';
       log(id ? `${fileName} ${id}` : fileName);
+      if (parsed.deleteAfterUpload) await hideMap(file, owners.get(file));
     } catch (err) {
       failed += 1;
       error(`${fileName}: ${err instanceof Error ? err.message : String(err)}`);
@@ -118,6 +126,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let url: string | undefined;
   let apiKey: string | undefined;
   let silverstripeCombineFiles = false;
+  let urlPrefix: string | undefined;
+  let deleteAfterUpload = false;
   const positionals: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] ?? '';
@@ -127,6 +137,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
       url = requireValue(args, ++i, '--url');
     } else if (arg === '--api-key') {
       apiKey = requireValue(args, ++i, '--api-key');
+    } else if (arg === '--url-prefix') {
+      urlPrefix = requireValue(args, ++i, '--url-prefix');
+    } else if (arg === '--delete-after-upload') {
+      deleteAfterUpload = true;
     } else if (arg === '--silverstripe-combine-files') {
       silverstripeCombineFiles = true;
     } else if (arg.startsWith('--')) {
@@ -144,7 +158,27 @@ export function parseArgs(argv: string[]): ParsedArgs {
     url,
     apiKey,
     silverstripeCombineFiles,
+    urlPrefix,
+    deleteAfterUpload,
   };
+}
+
+function withPrefix(prefix: string | undefined, fileName: string): string {
+  const clean = (prefix ?? '').replace(/^[~/]+|\/+$/g, '');
+  return clean ? `${clean}/${fileName}` : fileName;
+}
+
+const MAP_COMMENT = /^\/\/[#@] sourceMappingURL=\S+[ \t]*$/gm;
+
+/** Remove an uploaded map and the sibling's `sourceMappingURL` comment, so it is never public. */
+export async function hideMap(mapPath: string, owner?: string): Promise<void> {
+  const jsPath = owner ?? mapPath.slice(0, -'.map'.length);
+  if (jsPath.endsWith('.js') && (await exists(jsPath))) {
+    const js = await readFile(jsPath, 'utf8');
+    const stripped = js.replace(MAP_COMMENT, '');
+    if (stripped !== js) await writeFile(jsPath, stripped);
+  }
+  await rm(mapPath, { force: true });
 }
 
 /** One empty generated line, matching Silverstripe's header before the first combined file. */
@@ -165,6 +199,28 @@ function requireValue(args: string[], index: number, flag: string): string {
   return value;
 }
 
+const MAP_REF = /\/\/[#@] sourceMappingURL=([^\s'"]+)\s*$/m;
+
+/** Map path -> the `.js` file whose `sourceMappingURL` names it (relative URLs only). */
+export async function mapOwners(root: string): Promise<Map<string, string>> {
+  const files: string[] = [];
+  await walk(root, files, '.js');
+  const owners = new Map<string, string>();
+  for (const js of files) {
+    let text: string;
+    try {
+      text = await readFile(js, 'utf8');
+    } catch {
+      continue;
+    }
+    const ref = text.slice(-2048).match(MAP_REF)?.[1] ?? text.match(MAP_REF)?.[1];
+    if (!ref || /^(data:|[a-z]+:\/\/)/i.test(ref)) continue;
+    const target = path.resolve(path.dirname(js), decodeURIComponent(ref.split(/[?#]/)[0] ?? ''));
+    if (target.endsWith('.map') && !owners.has(target)) owners.set(target, js);
+  }
+  return owners;
+}
+
 async function collectMaps(root: string): Promise<string[]> {
   const out: string[] = [];
   await walk(root, out);
@@ -172,7 +228,7 @@ async function collectMaps(root: string): Promise<string[]> {
   return out;
 }
 
-async function walk(dir: string, out: string[]): Promise<void> {
+async function walk(dir: string, out: string[], suffix = '.js.map'): Promise<void> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
@@ -183,8 +239,8 @@ async function walk(dir: string, out: string[]): Promise<void> {
     if (entry.name === 'node_modules' || entry.name === '.git') continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      await walk(full, out);
-    } else if (entry.isFile() && entry.name.endsWith('.js.map')) {
+      await walk(full, out, suffix);
+    } else if (entry.isFile() && entry.name.endsWith(suffix)) {
       out.push(full);
     }
   }
@@ -201,6 +257,8 @@ function fileNameOk(name: string): boolean {
 
 interface PreparedArtifact {
   fileName: string;
+  /** No JavaScript file found for the map: uploaded by basename, which the server also matches. */
+  orphan?: boolean;
   debugId?: string;
   json: string;
 }
@@ -208,10 +266,11 @@ interface PreparedArtifact {
 async function prepareArtifact(
   root: string,
   mapPath: string,
+  owner?: string,
 ): Promise<PreparedArtifact> {
   const jsonText = await readFile(mapPath, 'utf8');
   const parsed = parseMap(jsonText);
-  const jsPath = mapPath.slice(0, -'.map'.length);
+  const jsPath = owner ?? mapPath.slice(0, -'.map'.length);
   const sibling =
     jsPath.endsWith('.js') && jsPath !== mapPath && (await exists(jsPath));
   if (!sibling || !parsed) {
@@ -219,6 +278,7 @@ async function prepareArtifact(
       fileName: path.basename(mapPath).replace(/\.map$/, ''),
       debugId: debugIdOf(parsed),
       json: jsonText,
+      orphan: true,
     };
   }
 

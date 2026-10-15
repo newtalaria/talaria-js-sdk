@@ -239,4 +239,59 @@ describe('sourcemaps upload', () => {
       assert.equal(uploaded.mappings, ';AAAA');
     }
   });
+
+  it('prefixes artifact paths and hides uploaded maps (--url-prefix, --delete-after-upload)', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'talaria-next-'));
+    const chunks = path.join(root, '.next', 'static', 'chunks');
+    await mkdir(chunks, { recursive: true });
+    await writeFile(path.join(chunks, 'app-1a2b.js'), 'console.log(1)\n//# sourceMappingURL=app-1a2b.js.map\n');
+    await writeFile(path.join(chunks, 'app-1a2b.js.map'), mapJson);
+    const names: string[] = [];
+    const previous = globalThis.fetch;
+    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+      names.push((JSON.parse(String(init?.body)) as { input: { fileName: string } }).input.fileName);
+      return new Response(JSON.stringify({ id: 'm' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    try {
+      const code = await uploadSourceMaps({
+        cwd: root,
+        argv: ['sourcemaps', 'upload', '.next/static', '--url-prefix', '~/_next/static/', '--delete-after-upload'],
+        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        log: () => {},
+        error: () => {},
+      });
+      assert.equal(code, 0);
+    } finally {
+      globalThis.fetch = previous;
+    }
+    assert.deepEqual(names, ['_next/static/chunks/app-1a2b.js']);
+    await assert.rejects(readFile(path.join(chunks, 'app-1a2b.js.map')));
+    const js = await readFile(path.join(chunks, 'app-1a2b.js'), 'utf8');
+    assert.equal(js.includes('sourceMappingURL'), false);
+    assert.ok(js.includes('//# debugId='));
+  });
+
+  it('pairs a map with the chunk that references it when names differ (Turbopack)', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'talaria-turbo-'));
+    const chunks = path.join(root, 'static', 'chunks');
+    await mkdir(chunks, { recursive: true });
+    await writeFile(path.join(chunks, '2zmz.js'), 'y()\n//# sourceMappingURL=40u7.js.map');
+    await writeFile(path.join(chunks, '40u7.js.map'), mapJson);
+    const names: string[] = [];
+    const previous = globalThis.fetch;
+    globalThis.fetch = (async (_u: string | URL | Request, init?: RequestInit) => {
+      names.push((JSON.parse(String(init?.body)) as { input: { fileName: string } }).input.fileName);
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    try {
+      const code = await uploadSourceMaps({ cwd: root, argv: ['sourcemaps', 'upload', 'static', '--url-prefix', '_next/static', '--delete-after-upload'], env: { TALARIA_RELEASE_KEY: 'k' }, log: () => {}, error: () => {} });
+      assert.equal(code, 0);
+    } finally {
+      globalThis.fetch = previous;
+    }
+    assert.deepEqual(names, ['_next/static/chunks/2zmz.js']);
+    const js = await readFile(path.join(chunks, '2zmz.js'), 'utf8');
+    assert.equal(js.includes('sourceMappingURL'), false);
+    await assert.rejects(readFile(path.join(chunks, '40u7.js.map')));
+  });
 });

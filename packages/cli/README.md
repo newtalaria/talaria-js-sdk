@@ -57,6 +57,8 @@ Hidden source maps work. Talaria reads the uploaded file when the event is opene
 | Release | `--release` | `TALARIA_RELEASE` | `local` |
 | Key | `--api-key` | `TALARIA_RELEASE_KEY`, then `TALARIA_API_KEY` | required |
 | Silverstripe combine | `--silverstripe-combine-files` | | off |
+| Artifact path prefix | `--url-prefix` | | none (`_next/static` for `.next/static`) |
+| Delete maps after upload | `--delete-after-upload` | | off (removes each uploaded `.map` and its `sourceMappingURL` comment) |
 
 `--silverstripe-combine-files` is the Silverstripe compatibility mode. `Requirements::combine_files` writes one header line before the first file. The flag shifts that map's generated lines by one and still writes the debug id into the sibling `.js`. The uploaded script is that first file. Deploy the rewritten `.js` so the combiner reads it. A script the browser loads directly is uploaded without the flag.
 

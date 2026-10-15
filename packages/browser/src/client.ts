@@ -1,3 +1,4 @@
+import { exceptionTitle } from './utils/exception_title.js';
 import type {
   BeforeSendEvent,
   CaptureContext,
@@ -687,7 +688,7 @@ export class TalariaClient {
           void this.capture({
             message,
             level: status >= 500 ? 'error' : 'warning',
-            title: networkExceptionClass(enriched),
+            title: exceptionTitle(networkExceptionClass(enriched), message),
             exception: networkExceptionData(enriched, message),
             platform: PLATFORM_JAVASCRIPT,
             context: {
@@ -713,7 +714,7 @@ export class TalariaClient {
           void this.capture({
             message,
             level: 'error',
-            title: networkExceptionClass(meta),
+            title: exceptionTitle(networkExceptionClass(meta), message),
             exception: networkExceptionData(meta, message),
             platform: PLATFORM_JAVASCRIPT,
             context: {
@@ -1287,7 +1288,7 @@ export class TalariaClient {
       await this.capture({
         message: err.message || err.name || 'Error',
         level: 'error',
-        title: err.name || 'Error',
+        title: exceptionTitle(err.name || 'Error', err.message),
         stackTrace: err.stack,
         exception: buildExceptionFromError(
           err,
@@ -2540,7 +2541,11 @@ export class TalariaClient {
   }
 
   private enqueueUpload(task: () => Promise<void>): Promise<void> {
-    this.uploadChain = this.uploadChain.then(task, task);
+    // Upload tasks are often started with `void`; a failure must not surface as an
+    // unhandled rejection (the global handler would capture the SDK's own transport error).
+    this.uploadChain = this.uploadChain.then(task, task).catch((error: unknown) => {
+      console.warn('@newtalaria/browser: replay upload failed', error);
+    });
     return this.uploadChain;
   }
 
@@ -2567,7 +2572,10 @@ export class TalariaClient {
       if (isPermanentIngestError(error)) {
         this.disableIngestAfterPermanentError(error, 'replay');
       }
-      throw error;
+      // Never re-throw: callers run this from fire-and-forget upload tasks, so a rejected
+      // replays/start became an unhandled rejection and was filed as a TransportError issue.
+      // startedOnServer stays false, so segment upload skips and the next flush retries.
+      console.warn('@newtalaria/browser: replays/start failed', error);
     }
   }
 
