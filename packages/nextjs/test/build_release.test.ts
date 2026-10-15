@@ -27,6 +27,14 @@ describe('resolveBuildRelease', () => {
 });
 
 describe('collectCommits', () => {
+  it('falls back to the last commits when the previous release commit is unknown here', () => {
+    const seen: string[][] = [];
+    const git = (args: string[]) => { seen.push(args); return args.at(-1)!.includes('..') ? undefined : `${SHA}\x1fA\x1fa@x\x1ft\x1fm\x1e`; };
+    const commits = collectCommits({ commitSha: SHA, previousCommitSha: 'f'.repeat(40), git });
+    assert.equal(seen.length, 2);
+    assert.equal(seen[1]!.at(-1), SHA);
+    assert.equal(commits.length, 1);
+  });
   it('parses git log rows and uses the previous..current range', () => {
     let seen: string[] = [];
     const git = (args: string[]) => { seen = args; return `${SHA}\x1fAna\x1fana@x\x1f2026-10-15T00:00:00+13:00\x1fFix checkout\x1e\n`; };

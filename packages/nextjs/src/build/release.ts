@@ -100,7 +100,11 @@ export function collectCommits(input: { commitSha: string; previousCommitSha?: s
   const git = input.git ?? gitRunner(input.cwd ?? process.cwd());
   const limit = Math.max(1, Math.min(input.limit ?? 20, 250));
   const range = input.previousCommitSha && SHA.test(input.previousCommitSha) ? `${input.previousCommitSha}..${input.commitSha}` : input.commitSha;
-  const out = git(['log', `--max-count=${limit}`, '--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%s%x1e', range]);
+  const format = '--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%s%x1e';
+  let out = git(['log', `--max-count=${limit}`, format, range]);
+  // The previous release's commit may not be in this checkout (shallow CI clone, rewritten
+  // history): fall back to the last `limit` commits instead of sending none.
+  if (out === undefined && range !== input.commitSha) out = git(['log', `--max-count=${limit}`, format, input.commitSha]);
   if (!out) return [];
   return out
     .split('\x1e')

@@ -76,6 +76,13 @@ export async function uploadSourceMaps(
   const transport = new ServerpodTransport({ baseUrl: url, apiKey });
   let failed = 0;
   for (const file of maps) {
+    if (await isEmptyMap(file)) {
+      // Bundlers emit placeholder maps (no sources, no mappings) for generated chunks; the server
+      // rejects them, and they map nothing. Skip, but still hide them when asked.
+      log(`${path.relative(root, file)} skipped (empty source map)`);
+      if (parsed.deleteAfterUpload) await hideMap(file, owners.get(file));
+      continue;
+    }
     const prepared = await prepareArtifact(root, file, owners.get(file));
     const payload = parsed.silverstripeCombineFiles
       ? shiftForSilverstripeCombine(prepared.json)
@@ -219,6 +226,19 @@ export async function mapOwners(root: string): Promise<Map<string, string>> {
     if (target.endsWith('.map') && !owners.has(target)) owners.set(target, js);
   }
   return owners;
+}
+
+/** A map with no sources and no mappings (and no index sections) carries nothing to upload. */
+export async function isEmptyMap(file: string): Promise<boolean> {
+  try {
+    const m = parseMap(await readFile(file, 'utf8'));
+    if (!m) return false;
+    const sources = Array.isArray(m.sources) ? m.sources.length : 0;
+    const mappings = typeof m.mappings === 'string' ? m.mappings.replace(/;/g, '') : '';
+    return !m.sections && sources === 0 && mappings === '';
+  } catch {
+    return false;
+  }
 }
 
 async function collectMaps(root: string): Promise<string[]> {

@@ -107,7 +107,7 @@ export async function finalizeTalariaRelease(options: FinalizeOptions): Promise<
   const uploaded = lines.filter((l) => l.startsWith('_next/static/') && l.includes(' ')).length;
   result.mapsUploadedCount = uploaded;
   log(`${uploaded} source maps uploaded${code === 0 ? '' : ' (some failed)'}`);
-  const expected = lines.filter((l) => l.includes(' ') && !l.startsWith('http')).map((l) => l.split(' ')[0]!);
+  const expected = lines.filter((l) => l.includes(' ') && !l.startsWith('http') && !l.endsWith('(empty source map)')).map((l) => l.split(' ')[0]!);
   result.mapsVerified = await verifyUpload(transport, release, expected, error);
   if (result.mapsVerified !== undefined) log(`server lists ${result.mapsVerified}/${expected.length} uploaded maps for ${release}`);
   // Anything the upload left behind (failed uploads, CSS maps) must not be served either.
