@@ -294,4 +294,31 @@ describe('sourcemaps upload', () => {
     assert.equal(js.includes('sourceMappingURL'), false);
     await assert.rejects(readFile(path.join(chunks, '40u7.js.map')));
   });
+
+  it('skips empty placeholder maps (Turbopack) without failing, and still hides them', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'talaria-empty-'));
+    const chunks = path.join(root, 'static', 'chunks');
+    await mkdir(chunks, { recursive: true });
+    await writeFile(path.join(chunks, 'a.js'), 'a()\n//# sourceMappingURL=a.js.map');
+    await writeFile(path.join(chunks, 'a.js.map'), '{"version":3,"sources":[],"names":[],"mappings":""}');
+    await writeFile(path.join(chunks, 'b.js'), 'b()\n//# sourceMappingURL=b.js.map');
+    await writeFile(path.join(chunks, 'b.js.map'), mapJson);
+    const names: string[] = [];
+    const logs: string[] = [];
+    const previous = globalThis.fetch;
+    globalThis.fetch = (async (_u: string | URL | Request, init?: RequestInit) => {
+      names.push((JSON.parse(String(init?.body)) as { input: { fileName: string } }).input.fileName);
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    try {
+      const code = await uploadSourceMaps({ cwd: root, argv: ['sourcemaps', 'upload', 'static', '--url-prefix', '_next/static', '--delete-after-upload'], env: { TALARIA_RELEASE_KEY: 'k' }, log: (l) => logs.push(l), error: () => {} });
+      assert.equal(code, 0);
+    } finally {
+      globalThis.fetch = previous;
+    }
+    assert.deepEqual(names, ['_next/static/chunks/b.js']);
+    assert.ok(logs.some((l) => l.includes('skipped (empty source map)')));
+    await assert.rejects(readFile(path.join(chunks, 'a.js.map')));
+    assert.equal((await readFile(path.join(chunks, 'a.js'), 'utf8')).includes('sourceMappingURL'), false);
+  });
 });
