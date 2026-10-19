@@ -30,6 +30,8 @@ export interface SdkConfigDocument {
     maskAllInputs?: boolean;
     blockSelectors?: string[];
   };
+  /** Wire features the server accepts (absent on older servers). */
+  capabilities?: { gzipRequests?: boolean; binaryUploads?: boolean };
   ingest?: {
     events?: SdkMeterPolicy;
     transactions?: SdkMeterPolicy;
@@ -145,6 +147,9 @@ export async function fetchSdkConfig(
   if (!document) {
     throw new Error('Talaria sdk/getConfig returned an unreadable document');
   }
+  // Full and `unchanged` responses both carry capabilities; a server that
+  // sends none (older) turns gzip and binary uploads off.
+  transport.setCapabilities(document.capabilities);
   return document;
 }
 

@@ -1,4 +1,5 @@
 import type { ServerpodTransport } from './serverpod.js';
+import { isMissingBinaryRoute } from './replays.js';
 import { toServerpodByteData } from '../utils/gzip.js';
 
 /** Server rejects more than 50 pageviews or 1000 clicks in one batch. */
@@ -213,7 +214,13 @@ export interface HeatmapSnapshotParams {
   capturedAt: string;
 }
 
-/** `POST {baseUrl}/heatmaps/uploadSnapshot` — only for a server-requested pageview. */
+export const HEATMAP_SNAPSHOTS_PATH = '/ingest/v1/heatmaps/snapshots';
+
+/**
+ * Upload a snapshot for a server-requested pageview: raw gzip to
+ * `/ingest/v1/heatmaps/snapshots` when the server advertises
+ * `binaryUploads`, else `POST {baseUrl}/heatmaps/uploadSnapshot` (base64).
+ */
 export async function uploadHeatmapSnapshot(
   transport: ServerpodTransport,
   params: HeatmapSnapshotParams,
@@ -222,6 +229,24 @@ export async function uploadHeatmapSnapshot(
     throw new Error(
       `Talaria heatmaps/uploadSnapshot skipped: snapshot exceeds ${MAX_HEATMAP_SNAPSHOT_BYTES} bytes`,
     );
+  }
+  if (transport.capabilities.binaryUploads) {
+    try {
+      return await transport.callBinary(
+        HEATMAP_SNAPSHOTS_PATH,
+        {
+          pageViewId: params.pageViewId,
+          viewportWidth: params.viewportWidth,
+          viewportHeight: params.viewportHeight,
+          documentHeight: params.documentHeight,
+          capturedAt: params.capturedAt,
+        },
+        params.gzip,
+      );
+    } catch (error) {
+      if (!isMissingBinaryRoute(error)) throw error;
+      transport.disableBinaryUploads();
+    }
   }
   return transport.call('heatmaps', 'uploadSnapshot', {
     input: {

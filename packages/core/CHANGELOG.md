@@ -2,6 +2,8 @@
 
 ## Unreleased (proposed 0.5.6)
 
+- `ServerpodTransport` gzips JSON bodies of 1 KB and up (`Content-Encoding: gzip`, via `CompressionStream`) once `sdk/getConfig` returns `capabilities.gzipRequests: true`. `fetchSdkConfig` applies the capabilities, and a response without them (an older server) turns them off. Keepalive (page-close) sends are never gzipped. A 415 on a gzipped body resends it plain and stops compressing.
+- `ServerpodTransport.capabilities`, `setCapabilities`, `disableBinaryUploads` and `callBinary` (raw bytes to a binary upload route) are new.
 - `readProcessReleaseEnv` also reads literal `process.env.NEXT_PUBLIC_TALARIA_RELEASE` / `NEXT_PUBLIC_TALARIA_COMMIT_SHA`, so bundler-inlined values tag browser events.
 
 ## 0.5.5
