@@ -65,7 +65,11 @@ export {
 } from './identity.js';
 
 export {
+  GZIP_MIN_BYTES,
   ServerpodTransport,
+  gzipJson,
+  type CallOptions,
+  type ServerCapabilities,
   type ServerpodTransportOptions,
 } from './transport/serverpod.js';
 export {

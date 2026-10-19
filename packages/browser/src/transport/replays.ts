@@ -1,3 +1,4 @@
+import { TransportError } from '@newtalaria/core';
 import type { ServerpodTransport } from './serverpod.js';
 import { gzipBytes, toServerpodByteData } from '../utils/gzip.js';
 import { MAX_COMPRESSED_SEGMENT_BYTES } from '../replay/segment_buffer.js';
@@ -85,6 +86,43 @@ function ensureSegmentFits(compressed: Uint8Array, method: string): void {
   }
 }
 
+export const REPLAY_SEGMENTS_PATH = '/ingest/v1/replays/segments';
+
+/**
+ * Binary route statuses that mean "this server (or its proxy) doesn't have
+ * the route": switch to base64 RPC for good and resend there.
+ */
+export function isMissingBinaryRoute(error: unknown): boolean {
+  return (
+    error instanceof TransportError &&
+    (error.status === 404 || error.status === 405 || error.status === 415)
+  );
+}
+
+/** Raw gzip segment to the binary route (no base64). */
+async function postSegmentBinary(
+  transport: ServerpodTransport,
+  params: IngestSegmentParams,
+  compressed: Uint8Array,
+): Promise<unknown> {
+  return transport.callBinary(
+    REPLAY_SEGMENTS_PATH,
+    {
+      replayId: params.replayId,
+      segmentIndex: params.segmentIndex,
+      eventCount: params.events.length,
+      startedAt: params.startedAt.toISOString(),
+      endedAt: params.endedAt.toISOString(),
+    },
+    compressed,
+  );
+}
+
+/** Binary route when advertised and not a page-close send. */
+function useBinary(transport: ServerpodTransport, keepalive?: boolean) {
+  return transport.capabilities.binaryUploads && !keepalive;
+}
+
 export async function ingestReplaySegment(
   transport: ServerpodTransport,
   params: IngestSegmentParams,
@@ -92,6 +130,15 @@ export async function ingestReplaySegment(
   const compressed =
     params.gzip ?? (await compressReplayEvents(params.events));
   ensureSegmentFits(compressed, 'ingestSegment');
+
+  if (useBinary(transport, params.keepalive)) {
+    try {
+      return await postSegmentBinary(transport, params, compressed);
+    } catch (error) {
+      if (!isMissingBinaryRoute(error)) throw error;
+      transport.disableBinaryUploads();
+    }
+  }
 
   return transport.call(
     'replays',
@@ -114,13 +161,60 @@ export async function ingestReplaySegmentBatch(
     throw new Error('Talaria replays/ingestSegmentBatch requires segments');
   }
 
-  const serialized = [];
+  const compressedAll: Uint8Array[] = [];
   for (const params of segments) {
     const compressed =
       params.gzip ?? (await compressReplayEvents(params.events));
     ensureSegmentFits(compressed, 'ingestSegmentBatch');
-    serialized.push(serializeSegmentInput(params, compressed));
+    compressedAll.push(compressed);
   }
+
+  if (useBinary(transport, opts?.keepalive)) {
+    // One binary POST per segment, in order. Same contract as the batch
+    // RPC: the prefix that landed counts, the first failure is reported
+    // and the caller retries from there.
+    let accepted = 0;
+    let replayId = segments[0]!.replayId;
+    for (let i = 0; i < segments.length; i++) {
+      try {
+        const raw = await postSegmentBinary(
+          transport,
+          segments[i]!,
+          compressedAll[i]!,
+        );
+        const map =
+          raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+        if (typeof map.replayId === 'string' && map.replayId) {
+          replayId = map.replayId;
+        }
+        accepted++;
+      } catch (error) {
+        if (isMissingBinaryRoute(error) && i === 0) {
+          transport.disableBinaryUploads();
+          break;
+        }
+        if (i === 0) throw error;
+        return {
+          replayId,
+          acceptedCount: accepted,
+          failedCount: segments.length - accepted,
+          failures: [
+            {
+              index: i,
+              message: error instanceof Error ? error.message : String(error),
+            },
+          ],
+        };
+      }
+    }
+    if (accepted === segments.length) {
+      return { replayId, acceptedCount: accepted, failedCount: 0, failures: [] };
+    }
+  }
+
+  const serialized = segments.map((params, i) =>
+    serializeSegmentInput(params, compressedAll[i]!),
+  );
 
   const raw = await transport.call(
     'replays',

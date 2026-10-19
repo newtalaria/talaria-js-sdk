@@ -2,6 +2,7 @@
 
 ## Unreleased (proposed 0.5.6)
 
+- Replay segments and heatmap snapshots go as raw gzip to `/ingest/v1/replays/segments` and `/ingest/v1/heatmaps/snapshots` when the server advertises `capabilities.binaryUploads`, instead of base64 inside JSON (about 25% smaller on the wire). Page-close sends keep using the RPCs. If a binary route answers 404, 405 or 415, the SDK switches back to the RPCs for good and resends there.
 - Event titles are `<Type>: <message>` (truncated to 120 characters) instead of the bare exception type, for errors and synthetic network errors.
 - A rejected `replays/start` no longer re-throws from fire-and-forget upload tasks, so it is not captured as a `TransportError` issue; the next flush retries.
 
