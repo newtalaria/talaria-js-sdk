@@ -5,6 +5,9 @@ import { hideMap, mapOwners, uploadSourceMaps } from '@newtalaria/cli';
 import { collectCommits, resolveBuildRelease, type ReleaseCommit } from './release.js';
 
 const MAX_COMMITS = 250;
+/** Release `commitSha` on the wire: trimmed, 7–40 hex. Omitted and null are rejected. */
+const COMMIT_SHA = /^[0-9a-f]{7,40}$/i;
+/** Git `%H` ids attached as release commits. */
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 
 type Env = Record<string, string | undefined>;
@@ -163,13 +166,17 @@ async function attachRelease(a: {
   env: Env; result: FinalizeResult; log: (l: string) => void; error: (l: string) => void;
 }): Promise<void> {
   const { transport, release, commitSha, options, env, result, log, error } = a;
-  const full = FULL_SHA.test(commitSha) ? commitSha : undefined;
+  const sha = commitSha.trim();
+  if (!COMMIT_SHA.test(sha)) {
+    error('POST /v1/releases skipped: commitSha must be 7-40 hex characters');
+    return;
+  }
   const previous = options.previousCommitSha ?? env.TALARIA_PREVIOUS_COMMIT_SHA ?? null;
   const commits = (
     options.commits ??
     collectCommits({
-      commitSha,
-      previousCommitSha: previous && previous !== full ? previous : undefined,
+      commitSha: sha,
+      previousCommitSha: previous && previous !== sha ? previous : undefined,
       limit: options.commitLimit ?? MAX_COMMITS,
       cwd: options.projectDir,
     })
@@ -179,7 +186,7 @@ async function attachRelease(a: {
   try {
     const response = (await transport.call('v1', 'releases', {
       version: release,
-      commitSha: full,
+      commitSha: sha,
       previousCommitSha: previous,
       commits: commits.map((c) => ({
         id: c.id,

@@ -159,7 +159,7 @@ export async function reportDiscards(
 ): Promise<void> {
   if (discards.length === 0) return;
   await transport.call('v1', 'client-reports', {
-    reports: discards.map((row) => ({
+    discards: discards.map((row) => ({
       signal: row.signal,
       reason: row.reason,
       count: row.count,

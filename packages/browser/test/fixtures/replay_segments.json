@@ -1,0 +1,12 @@
+{
+  "segments": [
+    {
+      "replayId": "11111111-1111-4111-8111-111111111111",
+      "segmentIndex": 0,
+      "gzipBytes": "H4sIAAAAAAAAA4uuViqpLEhVsjKqjQUAOhelhgwAAAA=",
+      "eventCount": 1,
+      "startedAt": "2026-10-15T00:00:00.000Z",
+      "endedAt": "2026-10-15T00:00:01.000Z"
+    }
+  ]
+}

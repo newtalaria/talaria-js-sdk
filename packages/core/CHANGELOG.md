@@ -16,6 +16,7 @@
 
 ### Other Changes
 
+- `POST /v1/client-reports` sends `{"discards":[{"signal","reason","count"}]}`.
 - `ServerpodTransport` gzips JSON bodies of 1 KB and up (`Content-Encoding: gzip`, via `CompressionStream`) once `GET /v1/sdk-config` returns `capabilities.gzipRequests: true`. `fetchSdkConfig` applies the capabilities, and a response without them turns them off. Keepalive (page-close) sends are never gzipped. A 415 on a gzipped body resends it plain and stops compressing.
 - `ServerpodTransport.capabilities`, `setCapabilities`, `disableBinaryUploads` and `callBinary` (raw bytes to a binary upload route) are new.
 - `ServerpodTransport` now supports PUT via `CallOptions.method`

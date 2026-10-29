@@ -1,0 +1,14 @@
+{
+  "version": "main@abcdef1",
+  "commitSha": "abcdef1",
+  "previousCommitSha": "cccccccccccccccccccccccccccccccccccccccc",
+  "commits": [
+    {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorName": "Ana",
+      "authorEmail": "ana@example.com",
+      "timestamp": "2026-10-15T00:00:00Z",
+      "message": "Ship checkout"
+    }
+  ]
+}

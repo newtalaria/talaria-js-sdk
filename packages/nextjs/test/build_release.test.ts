@@ -108,6 +108,7 @@ describe('finalizeTalariaRelease', () => {
     assert.equal(r.commitsSent, 2);
     assert.equal(r.previousReleaseCommitSha, PREV);
     assert.equal(r.mapsVerified, undefined);
+    assert.equal(calls[0]!.params.commitSha, SHA);
     assert.deepEqual(uploaded, ['http://localhost:8180/v1/source-maps _next/static/chunks/main-1a.js']);
     assert.deepEqual(await readdir(chunks), ['main-1a.js']);
     assert.deepEqual(await readdir(path.join(dir, '.next', 'static', 'css')), []);
@@ -143,6 +144,85 @@ describe('finalizeTalariaRelease', () => {
       assert.equal(r.commitsSupported, true);
       assert.equal(r.releaseCreated, false);
       assert.ok(errors.some((line) => line.includes('/v1/releases')));
+    } finally {
+      globalThis.fetch = prev;
+    }
+  });
+  it('sends a trimmed 7-40 hex commitSha and skips anything else', async () => {
+    const { dir } = await fakeBuild();
+    const calls: Array<{ path: string; params: Record<string, unknown> }> = [];
+    const transport = { call: async (endpoint: string, method: string, params: Record<string, unknown>) => {
+      calls.push({ path: `${endpoint}/${method}`, params });
+      return { commitCount: 0 };
+    } };
+    const prev = globalThis.fetch;
+    globalThis.fetch = (async () => new Response('{"id":"m"}', { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+    const errors: string[] = [];
+    try {
+      const sent = await finalizeTalariaRelease({
+        projectDir: dir,
+        release: 'main@abcdef1',
+        commitSha: '  abcdef1  ',
+        apiKey: RELEASE_KEY,
+        url: 'http://localhost:8180',
+        env: {},
+        transport,
+        commits: [],
+        log: () => {},
+        error: (line) => errors.push(line),
+      });
+      assert.equal(calls[0]!.params.commitSha, 'abcdef1');
+      assert.notEqual(calls[0]!.params.commitSha, null);
+      assert.equal(sent.releaseCreated, true);
+
+      calls.length = 0;
+      const mid = 'b'.repeat(39);
+      await finalizeTalariaRelease({
+        projectDir: dir,
+        release: 'r',
+        commitSha: `  ${mid.toUpperCase()}  `,
+        apiKey: RELEASE_KEY,
+        url: 'http://localhost:8180',
+        env: {},
+        transport,
+        commits: [],
+        log: () => {},
+        error: (line) => errors.push(line),
+      });
+      assert.equal(calls[0]!.params.commitSha, mid.toUpperCase());
+
+      calls.length = 0;
+      errors.length = 0;
+      const skipped = await finalizeTalariaRelease({
+        projectDir: dir,
+        release: 'main@abc',
+        commitSha: 'abc123',
+        apiKey: RELEASE_KEY,
+        url: 'http://localhost:8180',
+        env: {},
+        transport,
+        commits: [],
+        log: () => {},
+        error: (line) => errors.push(line),
+      });
+      assert.equal(calls.some((c) => c.path === 'v1/releases'), false);
+      assert.equal(skipped.releaseCreated, false);
+      assert.equal(skipped.commitSha, undefined);
+
+      const tooLong = await finalizeTalariaRelease({
+        projectDir: dir,
+        release: 'r',
+        commitSha: 'a'.repeat(41),
+        apiKey: RELEASE_KEY,
+        url: 'http://localhost:8180',
+        env: {},
+        transport,
+        commits: [],
+        log: () => {},
+        error: () => {},
+      });
+      assert.equal(calls.some((c) => c.path === 'v1/releases'), false);
+      assert.equal(tooLong.commitSha, undefined);
     } finally {
       globalThis.fetch = prev;
     }
