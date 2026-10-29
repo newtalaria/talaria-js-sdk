@@ -22,8 +22,8 @@ Source: [github.com/newtalaria/talaria-js-sdk](https://github.com/newtalaria/tal
 
 ## What you get
 
-- Batched ingest to `/events/ingestBatch` and (when tracing is on) `/spans/ingestBatch`
-- Project API key auth (`X-API-Key`, `tal_prod_…`)
+- Batched ingest to `POST /v1/events` and (when tracing is on) `POST /v1/spans`
+- `Authorization: Bearer` with `tal_pk_` / `tal_sk_` keys (CRC32 checksum)
 - Server-side fingerprinting — the SDK never computes issue groups
 - Tracing **off** until you opt in (`enableTracing` / `tracesSampleRate`)
 - Browser session replay (rrweb) on `@newtalaria/browser` and the React / Next client surfaces

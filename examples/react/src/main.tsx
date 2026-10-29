@@ -8,7 +8,7 @@ const apiKey = import.meta.env.VITE_TALARIA_BROWSER_API_KEY || '';
 
 if (apiKey) {
   Talaria.init({
-    url: import.meta.env.VITE_TALARIA_URL || 'https://ingest.newtalaria.com',
+    url: import.meta.env.VITE_TALARIA_URL || undefined,
     apiKey,
     remoteConfig: true,
   });

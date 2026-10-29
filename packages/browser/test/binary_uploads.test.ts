@@ -60,7 +60,7 @@ function segment(i: number) {
 function transport(caps?: Record<string, boolean>) {
   const t = new ServerpodTransport({
     baseUrl: 'https://ingest.example.com',
-    apiKey: 'tal_test_test',
+    apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
   });
   if (caps) t.setCapabilities(caps);
   return t;
@@ -71,7 +71,11 @@ describe('replay segments', () => {
     const seen = mockFetch();
     await ingestReplaySegment(transport(), segment(0));
     assert.equal(seen[0]!.url.pathname, '/v1/replays/segments');
-    assert.match(seen[0]!.body.toString(), /decode\('/);
+    const rpc = JSON.parse(seen[0]!.body.toString()) as {
+      segments: Array<{ gzipBytes: string }>;
+    };
+    assert.match(rpc.segments[0]!.gzipBytes, /^[A-Za-z0-9+/=]+$/);
+    assert.equal(rpc.segments[0]!.gzipBytes.includes("decode('"), false);
   });
 
   it('binaryUploads: raw gzip to the binary route, no base64', async () => {

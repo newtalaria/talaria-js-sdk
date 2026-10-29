@@ -9,6 +9,7 @@ import {
   createMemoryStorage,
   evaluateFlags,
   flagEvaluationFromWire,
+  listFlagDefinitions,
 } from '../src/index.ts';
 
 function evaluateResponse(args: {
@@ -82,8 +83,7 @@ describe('feature flags client', () => {
 
   it('boolVariation uses evaluate result and stampTags', async () => {
     const restore = installFetch((_url, body) => {
-      const input = body.input as Record<string, unknown>;
-      assert.equal(input.__className__, 'EvaluateFlagsInput');
+      const input = body;
       assert.equal(input.anonymousId, 'anon-1');
       return evaluateResponse({
         key: 'demo-kill-switch',
@@ -263,9 +263,8 @@ describe('feature flags client', () => {
         userId: 'user_1',
         attributes: { plan: 'team' },
       });
-      assert.equal(url, 'http://localhost:8080/v1/flags');
-      const input = body!.input as Record<string, unknown>;
-      assert.equal(input.__className__, 'EvaluateFlagsInput');
+      assert.equal(url, 'http://localhost:8080/v1/flags/evaluate');
+      const input = body!;
       assert.equal(input.anonymousId, 'anon_1');
       assert.equal((input.attributes as Record<string, string>).plan, 'team');
       assert.equal((result.evaluations as Array<Record<string, unknown>>)[0]!.key, 'demo');
@@ -295,7 +294,7 @@ describe('feature flags client', () => {
         const url = String(input);
         const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
         if (url.includes('/v1/analytics')) {
-          const inputBody = body.input as Record<string, unknown>;
+          const inputBody = body;
           const events = inputBody.events as Array<Record<string, unknown>>;
           for (const event of events) names.push(String(event.name));
         }
@@ -393,6 +392,32 @@ describe('feature flags client', () => {
       flags.close();
     } finally {
       restore();
+    }
+  });
+
+  it('lists definitions with GET /v1/flags?keys=', async () => {
+    let url = '';
+    let method = '';
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      url = String(input);
+      method = init?.method ?? 'GET';
+      return new Response(JSON.stringify({ flags: [{ key: 'demo' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+    try {
+      const transport = new ServerpodTransport({
+        baseUrl: 'http://localhost:8080',
+        apiKey: 'tal_test_test',
+      });
+      const result = await listFlagDefinitions(transport, ['demo', 'other']);
+      assert.equal(method, 'GET');
+      assert.equal(url, 'http://localhost:8080/v1/flags?keys=demo%2Cother');
+      assert.equal((result.flags as Array<{ key: string }>)[0]!.key, 'demo');
+    } finally {
+      globalThis.fetch = original;
     }
   });
 });

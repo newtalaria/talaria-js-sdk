@@ -1,7 +1,7 @@
 import { Talaria } from '@newtalaria/browser';
 import './style.css';
 
-const url = import.meta.env.VITE_TALARIA_URL || 'https://ingest.newtalaria.com';
+const url = import.meta.env.VITE_TALARIA_URL || 'the host derived from the key';
 const apiKey = import.meta.env.VITE_TALARIA_BROWSER_API_KEY || '';
 const ready = Boolean(apiKey);
 

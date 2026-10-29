@@ -4,6 +4,7 @@ export interface EvaluateFlagsInput {
   anonymousId?: string;
   userId?: string;
   organizationId?: string;
+  sessionId?: string;
   attributes?: Record<string, string>;
   keys?: string[];
 }
@@ -19,23 +20,38 @@ function unwrapServerpodResult(raw: unknown): Record<string, unknown> {
 }
 
 /**
- * Evaluate feature flags for the current visitor context.
+ * Evaluate feature flags for the current visitor.
  *
- * `GET {baseUrl}/v1/flags` with query parameters (API key auth, `flags:read` scope).
+ * `POST {baseUrl}/v1/flags/evaluate` (`flags:evaluate`, pk or sk).
+ * Body: `{anonymousId, userId, organizationId, sessionId, attributes, keys}`.
  */
 export async function evaluateFlags(
   transport: ServerpodTransport,
   input: EvaluateFlagsInput,
 ): Promise<Record<string, unknown>> {
-  const params: Record<string, unknown> = {};
-  if (input.anonymousId) params.anonymousId = input.anonymousId;
-  if (input.userId) params.userId = input.userId;
-  if (input.organizationId) params.organizationId = input.organizationId;
+  const body: Record<string, unknown> = {};
+  if (input.anonymousId) body.anonymousId = input.anonymousId;
+  if (input.userId) body.userId = input.userId;
+  if (input.organizationId) body.organizationId = input.organizationId;
+  if (input.sessionId) body.sessionId = input.sessionId;
   if (input.attributes && Object.keys(input.attributes).length > 0) {
-    params.attributes = input.attributes;
+    body.attributes = input.attributes;
   }
-  if (input.keys && input.keys.length > 0) params.keys = input.keys;
+  if (input.keys && input.keys.length > 0) body.keys = input.keys;
 
-  const response = await transport.call('v1', 'flags', params, { method: 'GET' });
+  const response = await transport.call('v1/flags', 'evaluate', body);
+  return unwrapServerpodResult(response);
+}
+
+/**
+ * List flag definitions. `GET {baseUrl}/v1/flags?keys=` (`flags:read`, sk only).
+ */
+export async function listFlagDefinitions(
+  transport: ServerpodTransport,
+  keys?: string[],
+): Promise<Record<string, unknown>> {
+  const query: Record<string, unknown> = {};
+  if (keys && keys.length > 0) query.keys = keys.join(',');
+  const response = await transport.call('v1', 'flags', query, { method: 'GET' });
   return unwrapServerpodResult(response);
 }

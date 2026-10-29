@@ -10,7 +10,7 @@ cd talaria-js-sdk/examples/react
 cp .env.example .env
 ```
 
-Put a project client key (`tal_prod_…`) in `.env` as `VITE_TALARIA_BROWSER_API_KEY`. Local server: `VITE_TALARIA_URL=http://127.0.0.1:8080`.
+Put a publishable key (`tal_pk_…`) in `.env` as `VITE_TALARIA_BROWSER_API_KEY`. Omit `VITE_TALARIA_URL` to use `https://ingest-<cell>.newtalaria.com`. For a local server set `VITE_TALARIA_URL=http://127.0.0.1:8080`. Never prefix `TALARIA_API_KEY` or `TALARIA_RELEASE_KEY` with `VITE_`.
 
 **SECURITY**: Never use `VITE_` prefix with `TALARIA_API_KEY` or `TALARIA_RELEASE_KEY` — these are server-only secrets.
 

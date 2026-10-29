@@ -6,6 +6,9 @@ import { gunzipSync } from 'node:zlib';
 import { describe, it } from 'node:test';
 import { uploadSourceMaps } from '../src/upload.ts';
 
+const SK = 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ';
+const URL = 'http://localhost:8080';
+
 const mapJson = JSON.stringify({
   version: 3,
   file: 'main.js',
@@ -15,8 +18,8 @@ const mapJson = JSON.stringify({
   debugId: 'debug-1',
 });
 
-describe('sourcemaps upload', () => {
-  it('defaults to localhost and release local, and posts the hashed basename', async () => {
+describe('source-maps upload', () => {
+  it('posts plain base64 to TALARIA_URL /v1/source-maps with a Bearer sk key', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'talaria-maps-'));
     const assets = path.join(root, 'dist', 'assets');
     await mkdir(assets, { recursive: true });
@@ -42,8 +45,8 @@ describe('sourcemaps upload', () => {
     try {
       const code = await uploadSourceMaps({
         cwd: root,
-        argv: ['sourcemaps', 'upload', 'dist'],
-        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
+        argv: ['source-maps', 'upload', 'dist'],
+        env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL },
         log: (line) => logs.push(line),
         error: (line) => logs.push(`ERR ${line}`),
       });
@@ -53,26 +56,20 @@ describe('sourcemaps upload', () => {
     }
 
     assert.equal(requests.length, 1);
-    assert.equal(requests[0]!.url, 'http://localhost:8080/sourceMaps/upload');
+    assert.equal(requests[0]!.url, 'http://localhost:8080/v1/source-maps');
     const headers = requests[0]!.init.headers as Record<string, string>;
-    assert.equal(headers['X-API-Key'], 'tal_test_release');
+    assert.equal(headers['Authorization'], `Bearer ${SK}`);
     const body = JSON.parse(String(requests[0]!.init.body)) as {
-      input: {
-        __className__: string;
-        release: string;
-        fileName: string;
-        gzipBytes: string;
-        debugId?: string;
-      };
+      release: string;
+      fileName: string;
+      gzipBytes: string;
+      debugId?: string;
     };
-    assert.equal(body.input.__className__, 'UploadSourceMapInput');
-    assert.equal(body.input.release, 'local');
-    assert.equal(body.input.fileName, 'main.a1b2c3.js');
-    assert.equal(body.input.debugId, 'debug-1');
-    const wrapped = body.input.gzipBytes;
-    assert.match(wrapped, /^decode\('[A-Za-z0-9+/=]+', 'base64'\)$/);
-    const b64 = wrapped.slice("decode('".length, -"', 'base64')".length);
-    const decoded = gunzipSync(Buffer.from(b64, 'base64')).toString('utf8');
+    assert.equal(body.release, 'local');
+    assert.equal(body.fileName, 'main.a1b2c3.js');
+    assert.equal(body.debugId, 'debug-1');
+    assert.equal(body.gzipBytes.includes('decode('), false);
+    const decoded = gunzipSync(Buffer.from(body.gzipBytes, 'base64')).toString('utf8');
     assert.equal(decoded, mapJson);
     assert.ok(logs.includes('http://localhost:8080 release local'));
     assert.ok(logs.includes('main.a1b2c3.js'));
@@ -92,8 +89,8 @@ describe('sourcemaps upload', () => {
     try {
       const code = await uploadSourceMaps({
         cwd: root,
-        argv: ['sourcemaps', 'upload', 'dist'],
-        env: { TALARIA_API_KEY: 'tal_test_release' },
+        argv: ['source-maps', 'upload', 'dist'],
+        env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL },
         log: () => {},
         error: () => {},
       });
@@ -140,15 +137,15 @@ describe('sourcemaps upload', () => {
     try {
       const first = await uploadSourceMaps({
         cwd: root,
-        argv: ['sourcemaps', 'upload', 'dist'],
-        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
+        argv: ['source-maps', 'upload', 'dist'],
+        env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL },
         log: () => {},
         error: () => {},
       });
       const second = await uploadSourceMaps({
         cwd: root,
-        argv: ['sourcemaps', 'upload', 'dist'],
-        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
+        argv: ['source-maps', 'upload', 'dist'],
+        env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL },
         log: () => {},
         error: () => {},
       });
@@ -166,14 +163,15 @@ describe('sourcemaps upload', () => {
     assert.equal(map.debugId, matches[0]!.replace('//# debugId=', ''));
 
     const body = JSON.parse(String(requests[0]!.init.body)) as {
-      input: { fileName: string; debugId?: string };
+      fileName: string;
+      debugId?: string;
     };
-    assert.equal(body.input.fileName, 'assets/app.js');
-    assert.equal(body.input.debugId, map.debugId);
+    assert.equal(body.fileName, 'assets/app.js');
+    assert.equal(body.debugId, map.debugId);
     const again = JSON.parse(String(requests[1]!.init.body)) as {
-      input: { debugId?: string };
+      debugId?: string;
     };
-    assert.equal(again.input.debugId, map.debugId);
+    assert.equal(again.debugId, map.debugId);
   });
 
   it('shifts generated lines by one when Silverstripe combines the first file', async () => {
@@ -206,15 +204,15 @@ describe('sourcemaps upload', () => {
     try {
       const first = await uploadSourceMaps({
         cwd: root,
-        argv: ['sourcemaps', 'upload', 'source-maps', '--silverstripe-combine-files'],
-        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
+        argv: ['source-maps', 'upload', 'source-maps', '--silverstripe-combine-files'],
+        env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL },
         log: (line) => logs.push(line),
         error: () => {},
       });
       const second = await uploadSourceMaps({
         cwd: root,
-        argv: ['sourcemaps', 'upload', 'source-maps', '--silverstripe-combine-files'],
-        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
+        argv: ['source-maps', 'upload', 'source-maps', '--silverstripe-combine-files'],
+        env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL },
         log: () => {},
         error: () => {},
       });
@@ -228,12 +226,8 @@ describe('sourcemaps upload', () => {
     const onDisk = JSON.parse(await readFile(mapPath, 'utf8')) as { mappings: string };
     assert.equal(onDisk.mappings, 'AAAA');
     for (const request of requests) {
-      const body = JSON.parse(String(request.init.body)) as {
-        input: { gzipBytes: string };
-      };
-      const wrapped = body.input.gzipBytes;
-      const b64 = wrapped.slice("decode('".length, -"', 'base64')".length);
-      const uploaded = JSON.parse(gunzipSync(Buffer.from(b64, 'base64')).toString('utf8')) as {
+      const body = JSON.parse(String(request.init.body)) as { gzipBytes: string };
+      const uploaded = JSON.parse(gunzipSync(Buffer.from(body.gzipBytes, 'base64')).toString('utf8')) as {
         mappings: string;
       };
       assert.equal(uploaded.mappings, ';AAAA');
@@ -249,14 +243,14 @@ describe('sourcemaps upload', () => {
     const names: string[] = [];
     const previous = globalThis.fetch;
     globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
-      names.push((JSON.parse(String(init?.body)) as { input: { fileName: string } }).input.fileName);
+      names.push((JSON.parse(String(init?.body)) as { fileName: string }).fileName);
       return new Response(JSON.stringify({ id: 'm' }), { status: 200, headers: { 'content-type': 'application/json' } });
     }) as typeof fetch;
     try {
       const code = await uploadSourceMaps({
         cwd: root,
-        argv: ['sourcemaps', 'upload', '.next/static', '--url-prefix', '~/_next/static/', '--delete-after-upload'],
-        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
+        argv: ['source-maps', 'upload', '.next/static', '--url-prefix', '~/_next/static/', '--delete-after-upload'],
+        env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL },
         log: () => {},
         error: () => {},
       });
@@ -280,11 +274,11 @@ describe('sourcemaps upload', () => {
     const names: string[] = [];
     const previous = globalThis.fetch;
     globalThis.fetch = (async (_u: string | URL | Request, init?: RequestInit) => {
-      names.push((JSON.parse(String(init?.body)) as { input: { fileName: string } }).input.fileName);
+      names.push((JSON.parse(String(init?.body)) as { fileName: string }).fileName);
       return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const code = await uploadSourceMaps({ cwd: root, argv: ['sourcemaps', 'upload', 'static', '--url-prefix', '_next/static', '--delete-after-upload'], env: { TALARIA_RELEASE_KEY: 'k' }, log: () => {}, error: () => {} });
+      const code = await uploadSourceMaps({ cwd: root, argv: ['source-maps', 'upload', 'static', '--url-prefix', '_next/static', '--delete-after-upload'], env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL }, log: () => {}, error: () => {} });
       assert.equal(code, 0);
     } finally {
       globalThis.fetch = previous;
@@ -307,11 +301,11 @@ describe('sourcemaps upload', () => {
     const logs: string[] = [];
     const previous = globalThis.fetch;
     globalThis.fetch = (async (_u: string | URL | Request, init?: RequestInit) => {
-      names.push((JSON.parse(String(init?.body)) as { input: { fileName: string } }).input.fileName);
+      names.push((JSON.parse(String(init?.body)) as { fileName: string }).fileName);
       return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const code = await uploadSourceMaps({ cwd: root, argv: ['sourcemaps', 'upload', 'static', '--url-prefix', '_next/static', '--delete-after-upload'], env: { TALARIA_RELEASE_KEY: 'k' }, log: (l) => logs.push(l), error: () => {} });
+      const code = await uploadSourceMaps({ cwd: root, argv: ['source-maps', 'upload', 'static', '--url-prefix', '_next/static', '--delete-after-upload'], env: { TALARIA_RELEASE_KEY: SK, TALARIA_URL: URL }, log: (l) => logs.push(l), error: () => {} });
       assert.equal(code, 0);
     } finally {
       globalThis.fetch = previous;

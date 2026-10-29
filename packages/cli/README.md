@@ -5,7 +5,7 @@ Uploads built JavaScript source maps so Talaria can show original frames when an
 The browser key stays an ingest key. This command uses a second key with only `releases:write`. The release string must match `Talaria.init({ release })`.
 
 ```sh
-npx talaria sourcemaps upload ./dist
+npx talaria source-maps upload ./dist
 ```
 
 ## Local
@@ -13,13 +13,13 @@ npx talaria sourcemaps upload ./dist
 With the Talaria API on port 8080:
 
 ```sh
-export TALARIA_RELEASE_KEY=tal_prod_…   # releases:write only
+export TALARIA_RELEASE_KEY=tal_sk_prod_…   # releases:write only
 export TALARIA_RELEASE=local            # same string as Talaria.init
 
-talaria sourcemaps upload ./dist
+talaria source-maps upload ./dist
 ```
 
-Defaults are `https://ingest.newtalaria.com` and release `local`. The command prints that URL, the release, and each artifact path. When a `.js` file sits beside a `.js.map`, the command writes one debug id into both and uploads the JavaScript path relative to the directory you passed (`dist/assets/app.js.map` is `assets/app.js`). Deploy those rewritten `.js` files. A map with no sibling keeps its basename.
+The ingest host is `TALARIA_URL` / `--url`, or `https://ingest-<cell>.newtalaria.com` derived from the `tal_sk_` release key. A `self` cell requires `--url`. The release defaults to `local`. The command prints that URL, the release, and each artifact path. When a `.js` file sits beside a `.js.map`, the command writes one debug id into both and uploads the JavaScript path relative to the directory you passed (`dist/assets/app.js.map` is `assets/app.js`). Deploy those rewritten `.js` files. A map with no sibling keeps its basename.
 
 ## CI
 
@@ -29,7 +29,7 @@ The CLI command is the same upload:
 
 ```sh
 export TALARIA_RELEASE="${GITHUB_REF_NAME}@${GITHUB_SHA::7}"
-npx talaria sourcemaps upload \
+npx talaria source-maps upload \
   --url "$TALARIA_URL" \
   --api-key "$TALARIA_RELEASE_KEY" \
   --release "$TALARIA_RELEASE" \
@@ -41,7 +41,7 @@ The app keeps its ingest key:
 ```js
 Talaria.init({
   url: process.env.NEXT_PUBLIC_TALARIA_URL,
-  apiKey: process.env.NEXT_PUBLIC_TALARIA_API_KEY,
+  apiKey: process.env.NEXT_PUBLIC_TALARIA_BROWSER_API_KEY, // tal_pk_ only
   release: process.env.NEXT_PUBLIC_TALARIA_RELEASE,
 })
 ```
@@ -53,9 +53,9 @@ Hidden source maps work. Talaria reads the uploaded file when the event is opene
 | Setting | Flag | Environment | Default |
 | ------- | ---- | ----------- | ------- |
 | Directory | positional | | `.` |
-| API URL | `--url` | `TALARIA_URL` | `https://ingest.newtalaria.com` |
+| API URL | `--url` | `TALARIA_URL` | derived from the key's cell |
 | Release | `--release` | `TALARIA_RELEASE` | `local` |
-| Key | `--api-key` | `TALARIA_RELEASE_KEY`, then `TALARIA_API_KEY` | required |
+| Key | `--api-key` | `TALARIA_RELEASE_KEY` (`tal_sk_` only) | required |
 | Silverstripe combine | `--silverstripe-combine-files` | | off |
 | Artifact path prefix | `--url-prefix` | | none (`_next/static` for `.next/static`) |
 | Delete maps after upload | `--delete-after-upload` | | off (removes each uploaded `.map` and its `sourceMappingURL` comment) |

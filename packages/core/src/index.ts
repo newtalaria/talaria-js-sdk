@@ -43,8 +43,27 @@ export {
 } from './flags/flag_evaluation.js';
 export {
   evaluateFlags,
+  listFlagDefinitions,
   type EvaluateFlagsInput,
 } from './transport/flags.js';
+export {
+  assertBrowserCredential,
+  assertReleaseCredential,
+  assertServerCredential,
+  checksumFor,
+  crc32,
+  encodeBase62Crc,
+  mintCredential,
+  parseCredential,
+  resetPublishableKeyWarning,
+  resolveIngestUrl,
+  type CredentialKind,
+  type CredentialResult,
+  type InvalidCredential,
+  type KeyClass,
+  type KeyEnv,
+  type ParsedCredential,
+} from './credentials.js';
 
 export {
   ANONYMOUS_ID_KEY,

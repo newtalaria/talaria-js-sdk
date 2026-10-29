@@ -60,7 +60,7 @@ describe('sdk policy document', () => {
   it('tombstones a rejected key and not a disabled signal', () => {
     const now = 50;
     const tombstone = tombstoneFromError(
-      new IngestError({ className: 'ApiNotFoundException', message: 'Project not found', retry: false }),
+      new IngestError({ code: 'invalid_key', message: 'Invalid API key', retry: false }),
       now,
     );
     assert.equal(tombstone?.kind, 'tombstone');
@@ -68,7 +68,7 @@ describe('sdk policy document', () => {
     assert.equal(
       tombstoneFromError(
         new IngestError({
-          className: 'ApiConflictException',
+          code: 'invalid_body',
           message: 'Tracing is disabled for this project',
           retry: false,
         }),
@@ -79,7 +79,7 @@ describe('sdk policy document', () => {
     assert.equal(
       disabledSignal(
         new IngestError({
-          className: 'ApiConflictException',
+          code: 'invalid_body',
           message: 'Analytics is disabled for this project',
           retry: false,
         }),

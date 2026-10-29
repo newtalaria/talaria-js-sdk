@@ -7,7 +7,7 @@ function tracer(): NodeTracer {
   return new NodeTracer({
     transport: new ServerpodTransport({
       baseUrl: 'http://localhost:8080',
-      apiKey: 'tal_test_test',
+      apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
     }),
     sampleRate: 1,
     resource: { 'service.name': 'test' },
@@ -36,7 +36,7 @@ async function flush(subject: NodeTracer) {
   try {
     await subject.shutdown();
     return bodies.flatMap((body) => {
-      const input = body.input as Record<string, unknown>;
+      const input = body;
       return (input.spans as Array<Record<string, unknown>>) ?? [];
     });
   } finally {

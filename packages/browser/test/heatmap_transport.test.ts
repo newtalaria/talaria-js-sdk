@@ -50,11 +50,11 @@ function pageView(id: string, clicks = 0): HeatmapPageViewParams {
 describe('heatmap transport', () => {
   it('serializes Serverpod envelopes', () => {
     const out = serializeHeatmapPageView({ ...pageView('pv', 1), device: 'desktop' });
-    assert.equal(out.__className__, 'IngestHeatmapPageViewInput');
     assert.equal(out.device, 'desktop');
     assert.equal('bot' in out, false);
     const clicks = out.clicks as Array<Record<string, unknown>>;
-    assert.equal(clicks[0]!.__className__, 'IngestHeatmapClickInput');
+    assert.equal(clicks.length, 1);
+    assert.equal(clicks[0]!.selector, 'body > main > section:nth-of-type(2) > button.primary');
   });
 
   it('splits by click count and keeps every click', () => {
@@ -191,7 +191,7 @@ describe('heatmap recorder', () => {
 
       const ingest = t.calls.find((c) => c.url.endsWith('/v1/heatmaps'));
       assert.ok(ingest);
-      const input = ingest.body.input as Record<string, unknown>;
+      const input = ingest.body;
       const pv = (input.pageViews as Array<Record<string, unknown>>)[0]!;
       assert.equal(pv.pageViewId, 'pv1');
       assert.equal(pv.replayId, 'replay-1');
@@ -203,7 +203,7 @@ describe('heatmap recorder', () => {
       assert.equal(t.snapshots(), 1);
       const upload = t.calls.find((c) => c.url.endsWith('/v1/heatmaps/snapshots'));
       assert.ok(upload);
-      assert.equal((upload.body.input as Record<string, unknown>).pageViewId, 'pv1');
+      assert.equal((upload.body).pageViewId, 'pv1');
     } finally {
       t.restore();
     }

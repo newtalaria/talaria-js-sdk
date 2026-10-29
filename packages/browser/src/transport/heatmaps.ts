@@ -1,6 +1,6 @@
 import type { ServerpodTransport } from './serverpod.js';
 import { isMissingBinaryRoute } from './replays.js';
-import { toServerpodByteData } from '../utils/gzip.js';
+import { toBase64 } from '../utils/gzip.js';
 
 /** Server rejects more than 50 pageviews or 1000 clicks in one batch. */
 export const MAX_HEATMAP_PAGEVIEWS_PER_BATCH = 50;
@@ -60,7 +60,6 @@ export interface HeatmapBatchResult {
 
 function serializeClick(c: HeatmapClickParams): Record<string, unknown> {
   return {
-    __className__: 'IngestHeatmapClickInput',
     clickIndex: c.clickIndex,
     occurredAt: c.occurredAt,
     selector: c.selector,
@@ -79,7 +78,6 @@ export function serializeHeatmapPageView(
   p: HeatmapPageViewParams,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'IngestHeatmapPageViewInput',
     pageViewId: p.pageViewId,
     anonymousId: p.anonymousId,
     sessionId: p.sessionId,
@@ -194,12 +192,7 @@ export async function ingestHeatmapBatch(
   const raw = await transport.call(
     'v1',
     'heatmaps',
-    {
-      input: {
-        __className__: 'IngestHeatmapBatchInput',
-        pageViews: pageViews.map(serializeHeatmapPageView),
-      },
-    },
+    { pageViews: pageViews.map(serializeHeatmapPageView) },
     { keepalive: opts?.keepalive },
   );
   return parseHeatmapBatchResponse(raw);
@@ -249,14 +242,11 @@ export async function uploadHeatmapSnapshot(
     }
   }
   return transport.call('v1/heatmaps', 'snapshots', {
-    input: {
-      __className__: 'UploadHeatmapSnapshotInput',
-      pageViewId: params.pageViewId,
-      gzipBytes: toServerpodByteData(params.gzip),
-      viewportWidth: params.viewportWidth,
-      viewportHeight: params.viewportHeight,
-      documentHeight: params.documentHeight,
-      capturedAt: params.capturedAt,
-    },
+    pageViewId: params.pageViewId,
+    gzipBytes: toBase64(params.gzip),
+    viewportWidth: params.viewportWidth,
+    viewportHeight: params.viewportHeight,
+    documentHeight: params.documentHeight,
+    capturedAt: params.capturedAt,
   });
 }

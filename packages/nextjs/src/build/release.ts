@@ -83,7 +83,10 @@ export function resolveBuildRelease(input: { release?: string; commitSha?: strin
     const ref = git(['rev-parse', '--abbrev-ref', 'HEAD']);
     if (ref && ref !== 'HEAD') branch = ref;
   }
-  const release = explicitRelease || (commitSha ? (branch ? `${branch}@${commitSha.slice(0, 7)}` : commitSha.slice(0, 12)) : undefined);
+  const generated = commitSha
+    ? (branch ? `${branch.replaceAll('/', '-')}@${commitSha.slice(0, 7)}` : commitSha.slice(0, 12))
+    : undefined;
+  const release = (explicitRelease ? explicitRelease.replaceAll('/', '-') : generated);
   return { release, commitSha, branch, source: release || commitSha ? source : 'none' };
 }
 

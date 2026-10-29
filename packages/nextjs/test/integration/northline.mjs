@@ -35,19 +35,17 @@ let baseUrl = process.env.TALARIA_BASE_URL;
 // releaseKey + projectId (new_talaria #38); no reseed happens with --key-only.
 let seed = {};
 if (process.env.NORTHLINE_SEED_CMD) seed = JSON.parse(execFileSync('bash', ['-c', process.env.NORTHLINE_SEED_CMD], { encoding: 'utf8' }));
-const apiKey = process.env.TALARIA_RELEASE_KEY ?? seed.releaseKey ?? 'tal_live_stub_releases_write';
+const apiKey = process.env.TALARIA_RELEASE_KEY ?? seed.releaseKey ?? 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ';
 const projectId = process.env.TALARIA_PROJECT_ID ?? seed.projectId; // optional since #38
 if (!baseUrl) {
   server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (d) => (body += d)).on('end', () => {
       const json = body ? JSON.parse(body) : {};
-      calls.push({ path: req.url, key: req.headers['x-api-key'], body: json });
-      // Shapes from new_talaria #38: setCommits creates the release and reports the previous one.
+      calls.push({ path: req.url, key: req.headers.authorization, body: json });
       let reply = { id: 'r1' };
-      if (req.url === '/sourceMaps/upload') { stored.push(json.input); reply = { id: `m${calls.length}`, release: json.input.release, fileName: json.input.fileName, sizeBytes: 1 }; }
-      if (req.url === '/releases/setCommits') reply = { __className__: 'SetReleaseCommitsResponse', version: json.input.version, commitSha: json.input.commitSha, commitCount: json.input.commits.length, previousReleaseVersion: 'integration@0000000', previousReleaseCommitSha: STUB_PREVIOUS };
-      if (req.url === '/sourceMaps/list') { const items = stored.filter((m) => m.release === json.release).map((m) => ({ fileName: m.fileName, release: m.release })); reply = { items, pagination: { page: 1, pageSize: json.pageSize, totalPages: 1, total: items.length } }; }
+      if (req.url === '/v1/source-maps') { stored.push(json); reply = { id: `m${calls.length}`, release: json.release, fileName: json.fileName, sizeBytes: 1 }; }
+      if (req.url === '/v1/releases') reply = { version: json.version, commitSha: json.commitSha, commitCount: json.commits.length, previousReleaseCommitSha: json.previousCommitSha ?? STUB_PREVIOUS };
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(reply));
     });
@@ -122,25 +120,22 @@ check(withComment.length === 0, `no sourceMappingURL comments left${withComment.
 
 // 6. Upload calls (stub) or the build log (real stack).
 if (server) {
-  const uploads = calls.filter((c) => c.path === '/sourceMaps/upload');
-  const sets = calls.filter((c) => c.path === '/releases/setCommits');
-  check(sets.length === 2 && sets[0].body.input.previousCommitSha === null && sets[0].body.input.commits.map((c) => c.id).join() === head, 'setCommits probe sends HEAD only and learns the previous release');
-  const last = sets.at(-1)?.body.input;
-  check(last?.version === release && last.commitSha === head && last.previousCommitSha === STUB_PREVIOUS && last.commits.length === 2 && last.commits[0].id === head && !last.commits.some((c) => c.id === STUB_PREVIOUS) && last.commits[0].__className__ === 'ReleaseCommitInput', 'setCommits sends previousReleaseCommitSha..HEAD (2 commits) with a 40-hex commitSha');
-  check(!calls.some((c) => c.path === '/source/createProjectRelease'), 'createProjectRelease skipped (setCommits creates the release)');
-  check(calls.some((c) => c.path === '/sourceMaps/list' && c.body.release === release) && /server lists (\d+)\/\1 uploaded maps/.test(out), 'upload verified with sourceMaps/list');
-  const served = uploads.filter((u) => u.body.input.fileName.startsWith('_next/static/'));
-  check(served.length > 0 && uploads.every((u) => u.body.input.release === release), `${uploads.length} maps uploaded for ${release}: ${served.length} as _next/static/..., ${uploads.length - served.length} unreferenced by basename`);
-  check(calls.every((c) => c.key === apiKey), 'every call used the releases:write key');
-  const sample = uploads[0] && JSON.parse(gunzipSync(Buffer.from(uploads[0].body.input.gzipBytes.slice(8, -12), 'base64')).toString('utf8'));
+  const uploads = calls.filter((c) => c.path === '/v1/source-maps');
+  const sets = calls.filter((c) => c.path === '/v1/releases');
+  const last = sets.at(-1)?.body;
+  check(sets.length === 1 && last?.version === release && last.commitSha === head && last.commits.some((c) => c.id === head) && last.commits[0].__className__ === undefined, 'POST /v1/releases sends the release and its commits');
+  check(!calls.some((c) => c.path === '/source/createProjectRelease' || c.path === '/sourceMaps/list' || c.path === '/sourceMaps/upload'), 'legacy release RPCs are not called');
+  const served = uploads.filter((u) => u.body.fileName.startsWith('_next/static/'));
+  check(served.length > 0 && uploads.every((u) => u.body.release === release), `${uploads.length} maps uploaded for ${release}: ${served.length} as _next/static/..., ${uploads.length - served.length} unreferenced by basename`);
+  check(calls.every((c) => c.key === `Bearer ${apiKey}`), 'every call used the releases:write key');
+  const sample = uploads[0] && JSON.parse(gunzipSync(Buffer.from(uploads[0].body.gzipBytes, 'base64')).toString('utf8'));
   check(Array.isArray(sample?.sources) && sample.sources.length > 0, 'uploaded payload is a real source map');
-  const unserved = uploads.map((u) => u.body.input.fileName).filter((n) => n.includes('/') && !js.some((f) => f.endsWith(n.replace(/^_next\/static/, ''))));
+  const unserved = uploads.map((u) => u.body.fileName).filter((n) => n.includes('/') && !js.some((f) => f.endsWith(n.replace(/^_next\/static/, ''))));
   check(unserved.length === 0, `every upload names a served chunk${unserved.length ? ` (not served: ${unserved.slice(0, 3).join(', ')})` : ''}`);
   server.close();
 } else {
   check(/source maps uploaded/.test(out) && !/some failed/.test(out), 'maps uploaded to the real stack');
-  check(/release created with \d+ commits/.test(out), 'release created by releases/setCommits');
-  check(/server lists (\d+)\/\1 uploaded maps/.test(out), 'sourceMaps/list lists every uploaded map');
+  check(/release created with \d+ commits/.test(out), 'release created by POST /v1/releases');
 }
 
 if (!process.env.KEEP_WORK) rmSync(work, { recursive: true, force: true });

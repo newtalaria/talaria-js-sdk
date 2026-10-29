@@ -64,7 +64,7 @@ describe('browser tracing', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -73,17 +73,13 @@ describe('browser tracing', () => {
       await client.flush();
       await client.close();
       assert.equal(
-        calls.some((c) => c.url.includes('/spans/')),
+        calls.some((c) => c.url.includes('/v1/spans')),
         false,
       );
-      const event = calls.find((c) => c.url.includes('/events/ingest'));
+      const event = calls.find((c) => c.url.includes('/v1/events'));
       assert.ok(event);
-      const raw = event!.body.input as Record<string, unknown>;
-      const input =
-        raw.__className__ === 'IngestEventBatchInput'
-          ? ((raw.events as Array<Record<string, unknown>>)[0] ?? {})
-          : raw;
-      assert.equal(input.traceId, undefined);
+      const events = event!.body.events as Array<Record<string, unknown>>;
+      assert.equal(events[0]!.traceId, undefined);
     } finally {
       restore();
     }
@@ -96,7 +92,7 @@ describe('browser tracing', () => {
         const client = new TalariaClient();
         client.init({
           url: 'http://localhost:8080',
-          apiKey: 'tal_test_test',
+          apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
           remoteConfig: false,
           disableDefaultIntegrations: true,
           networkErrorOrigins: ['https://api.stripe.com'],
@@ -121,25 +117,18 @@ describe('browser tracing', () => {
       await client.flush();
         await client.close();
 
-        const event = calls.find((c) => c.url.includes('/events/ingest'));
+        const event = calls.find((c) => c.url.includes('/v1/events'));
         assert.ok(event);
-        const raw = event!.body.input as Record<string, unknown>;
-        const eventInput =
-          raw.__className__ === 'IngestEventBatchInput'
-            ? ((raw.events as Array<Record<string, unknown>>)[0] ?? {})
-            : raw;
+        const eventInput = (event!.body.events as Array<Record<string, unknown>>)[0]!;
         assert.equal(typeof eventInput.traceId, 'string');
         assert.equal(String(eventInput.traceId).length, 32);
         const crumbs = eventInput.breadcrumbs as Array<Record<string, unknown>>;
         assert.ok(Array.isArray(crumbs));
         assert.ok(crumbs.some((c) => c.category === 'fetch' && c.type === 'http'));
-        assert.equal(crumbs[0]!.__className__, 'BreadcrumbDto');
 
         const spanCall = calls.find((c) => c.url.endsWith('/v1/spans'));
         assert.ok(spanCall);
-        const spanInput = spanCall!.body.input as Record<string, unknown>;
-        assert.equal(spanInput.__className__, 'IngestSpanBatchInput');
-        const spans = spanInput.spans as Array<Record<string, unknown>>;
+        const spans = spanCall!.body.spans as Array<Record<string, unknown>>;
         assert.ok(spans.length >= 1);
         assert.equal(
           spans.some((s) => s.name === '/checkout' || s.name === 'pageload'),
@@ -152,7 +141,7 @@ describe('browser tracing', () => {
         assert.equal(attrs['http.request.method'], 'GET');
         assert.equal(attrs['http.method'], undefined);
         assert.equal(
-          spanCall!.url.includes('/events/'),
+          spanCall!.url.includes('/v1/events'),
           false,
         );
       } finally {

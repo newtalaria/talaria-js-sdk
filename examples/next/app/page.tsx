@@ -4,8 +4,8 @@ import type { CSSProperties } from 'react';
 import { boomAction } from './actions';
 
 const url =
-  process.env.NEXT_PUBLIC_TALARIA_URL ?? 'https://ingest.newtalaria.com';
-const apiKey = process.env.NEXT_PUBLIC_TALARIA_API_KEY ?? '';
+  process.env.NEXT_PUBLIC_TALARIA_URL || '(derived from the publishable key)';
+const apiKey = process.env.NEXT_PUBLIC_TALARIA_BROWSER_API_KEY ?? '';
 const ready = Boolean(apiKey);
 
 export default function Page() {
@@ -32,7 +32,8 @@ export default function Page() {
         ) : (
           <>
             Copy <code>.env.example</code> to <code>.env.local</code> and set{' '}
-            <code>NEXT_PUBLIC_TALARIA_API_KEY</code> / <code>TALARIA_API_KEY</code>.
+            <code>NEXT_PUBLIC_TALARIA_BROWSER_API_KEY</code> and{' '}
+            <code>TALARIA_API_KEY</code>.
           </>
         )}
       </p>

@@ -131,8 +131,16 @@ export interface UserContext {
 }
 
 export interface CoreInitOptions {
+  /**
+   * Ingest origin. When omitted, the SDK derives `https://ingest-<cell>.newtalaria.com`
+   * from the API key. A `self` cell requires this or `TALARIA_URL`.
+   */
   url?: string;
-  apiKey: string;
+  /**
+   * `tal_pk_…` in the browser, `tal_sk_…` on the server.
+   * Node also reads `TALARIA_API_KEY` when this is omitted.
+   */
+  apiKey?: string;
   release?: string;
   commitSha?: string;
   /** `branch` or `tag` when the SDK resolved the release from CI. */

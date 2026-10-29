@@ -1,6 +1,6 @@
 import { TransportError } from '@newtalaria/core';
 import type { ServerpodTransport } from './serverpod.js';
-import { gzipBytes, toServerpodByteData } from '../utils/gzip.js';
+import { gzipBytes, toBase64 } from '../utils/gzip.js';
 import { MAX_COMPRESSED_SEGMENT_BYTES } from '../replay/segment_buffer.js';
 
 export interface StartReplayParams {
@@ -42,7 +42,6 @@ export async function startReplay(
   params: StartReplayParams,
 ): Promise<unknown> {
   const input: Record<string, unknown> = {
-    __className__: 'StartReplayInput',
     replayId: params.replayId,
   };
   if (params.sessionId) input.sessionId = params.sessionId;
@@ -51,12 +50,7 @@ export async function startReplay(
   if (params.userId) input.userId = params.userId;
   if (params.userAgent) input.userAgent = params.userAgent;
 
-  return transport.call(
-    'v1/replays',
-    '',
-    { input },
-    { keepalive: params.keepalive },
-  );
+  return transport.call('v1', 'replays', input, { keepalive: params.keepalive });
 }
 
 export interface IngestSegmentBatchResult {
@@ -68,10 +62,9 @@ export interface IngestSegmentBatchResult {
 
 function serializeSegmentInput(params: IngestSegmentParams, gzip: Uint8Array) {
   return {
-    __className__: 'IngestReplaySegmentInput',
     replayId: params.replayId,
     segmentIndex: params.segmentIndex,
-    gzipBytes: toServerpodByteData(gzip),
+    gzipBytes: toBase64(gzip),
     eventCount: params.events.length,
     startedAt: params.startedAt.toISOString(),
     endedAt: params.endedAt.toISOString(),
@@ -143,7 +136,7 @@ export async function ingestReplaySegment(
   return transport.call(
     'v1/replays',
     'segments',
-    { input: serializeSegmentInput(params, compressed) },
+    { segments: [serializeSegmentInput(params, compressed)] },
     { keepalive: params.keepalive },
   );
 }
@@ -219,12 +212,7 @@ export async function ingestReplaySegmentBatch(
   const raw = await transport.call(
     'v1/replays',
     'segments',
-    {
-      input: {
-        __className__: 'IngestReplaySegmentBatchInput',
-        segments: serialized,
-      },
-    },
+    { segments: serialized },
     { keepalive: opts?.keepalive },
   );
 
@@ -275,15 +263,16 @@ export async function finishReplay(
   params: FinishReplayParams,
 ): Promise<unknown> {
   const input: Record<string, unknown> = {
-    __className__: 'FinishReplayInput',
     replayId: params.replayId,
   };
   if (params.reason) input.reason = params.reason;
 
+  const body: Record<string, unknown> = {};
+  if (params.reason) body.reason = params.reason;
   return transport.call(
     `v1/replays/${params.replayId}`,
-    '',
-    { input },
-    { keepalive: params.keepalive, method: 'PUT' },
+    'finish',
+    body,
+    { keepalive: params.keepalive },
   );
 }

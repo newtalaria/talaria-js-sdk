@@ -17,8 +17,8 @@ Use **disjoint entrypoints** so the App Router never bundles Node `http` into th
 import { initClient } from '@newtalaria/nextjs/client';
 
 initClient({
-  dsn: 'https://ingest.newtalaria.com',
-  apiKey: process.env.NEXT_PUBLIC_TALARIA_API_KEY!,
+  url: process.env.NEXT_PUBLIC_TALARIA_URL,
+  apiKey: process.env.NEXT_PUBLIC_TALARIA_BROWSER_API_KEY!, // tal_pk_ only
 });
 ```
 
@@ -27,8 +27,8 @@ initClient({
 import { initServer } from '@newtalaria/nextjs/server';
 
 initServer({
-  dsn: 'https://ingest.newtalaria.com',
-  apiKey: process.env.TALARIA_API_KEY!,
+  url: process.env.TALARIA_URL,
+  apiKey: process.env.TALARIA_API_KEY!, // tal_sk_…
 });
 ```
 
@@ -68,11 +68,10 @@ export default withTalariaConfig({ /* your config */ });
 ```
 
 - **Release tagging:** the release is `TALARIA_RELEASE`, or `<branch>@<sha7>`. The SHA comes from `VERCEL_GIT_COMMIT_SHA`, `GITHUB_SHA`, `CI_COMMIT_SHA`, `CF_PAGES_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `COMMIT_REF`, `SOURCE_VERSION`, `BITBUCKET_COMMIT` or `CIRCLE_SHA1`, else `git rev-parse HEAD`. Both values are inlined as `NEXT_PUBLIC_TALARIA_RELEASE` and `NEXT_PUBLIC_TALARIA_COMMIT_SHA`, so every event is tagged. Leave `release` out of `Talaria.init`, or set it to the same value.
-- **Upload at build time:** set `TALARIA_RELEASE_KEY` (a `releases:write` key, never the browser key) and `TALARIA_URL`. The key names the project, so `TALARIA_PROJECT_ID` is optional. After `next build` compiles (Next 15.4+), the plugin:
-  1. creates the release with its commits through `releases/setCommits`. The range is the previous release's commit up to HEAD (at most 250 commits); the server reports the previous commit, or `TALARIA_PREVIOUS_COMMIT_SHA` sets it;
-  2. uploads `.next/static` source maps under their served paths (`_next/static/...`);
-  3. checks the upload with `sourceMaps/list`;
-  4. deletes the `.map` files and their `sourceMappingURL` comments.
+- **Upload at build time:** set `TALARIA_RELEASE_KEY` (a `tal_sk_` key with `releases:write`, never a browser key). `TALARIA_URL` is optional; otherwise the host is `https://ingest-<cell>.newtalaria.com` from the key. After `next build` compiles (Next 15.4+), the plugin:
+  1. creates the release with `POST /v1/releases` (plain JSON, commits from `TALARIA_PREVIOUS_COMMIT_SHA..HEAD` when that SHA is set, otherwise the recent commits);
+  2. uploads `.next/static` source maps with `POST /v1/source-maps` under their served paths (`_next/static/...`);
+  3. deletes the `.map` files and their `sourceMappingURL` comments.
 
   A failed upload never fails the build.
 - **Upload at deploy time instead:** pass `withTalariaConfig(config, { uploadSourceMaps: false, hideSourceMaps: false })` and run `npx talaria-nextjs upload` after the build. It takes the same env variables, and `--keep-maps` keeps the maps.

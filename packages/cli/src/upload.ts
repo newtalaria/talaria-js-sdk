@@ -2,13 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { access, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { ServerpodTransport, resolveReleaseIdentity } from '@newtalaria/core';
+import {
+  ServerpodTransport,
+  assertReleaseCredential,
+  resolveIngestUrl,
+  resolveReleaseIdentity,
+} from '@newtalaria/core';
 
 const SEGMENT = /^[A-Za-z0-9._~+-]+$/;
 const SAFE_DEBUG_ID = /^[A-Za-z0-9._~+-]{1,80}$/;
 const DEBUG_COMMENT = /\/\/# debugId=([^\s]+)/;
-const DEFAULT_URL = 'https://ingest.newtalaria.com';
-
 export interface UploadSourceMapsOptions {
   cwd: string;
   argv: string[];
@@ -42,20 +45,25 @@ export async function uploadSourceMaps(
     return 1;
   }
 
-  const url = parsed.url || options.env.TALARIA_URL || DEFAULT_URL;
+  const explicitUrl = parsed.url || options.env.TALARIA_URL;
   const release =
     resolveReleaseIdentity({
       release: parsed.release,
       env: options.env,
     }).release || 'local';
-  const apiKey =
-    parsed.apiKey ||
-    options.env.TALARIA_RELEASE_KEY ||
-    options.env.TALARIA_API_KEY;
+  const apiKey = parsed.apiKey || options.env.TALARIA_RELEASE_KEY;
   if (!apiKey) {
     error(
-      'Set TALARIA_RELEASE_KEY to a releases:write key, or pass --api-key.',
+      'Set TALARIA_RELEASE_KEY to a tal_sk_ releases:write key, or pass --api-key.',
     );
+    return 1;
+  }
+  let url: string;
+  try {
+    assertReleaseCredential(apiKey);
+    url = resolveIngestUrl({ apiKey, url: explicitUrl });
+  } catch (err) {
+    error(err instanceof Error ? err.message : String(err));
     return 1;
   }
 
@@ -98,16 +106,15 @@ export async function uploadSourceMaps(
     }
     const raw = Buffer.from(payload, 'utf8');
     const debugId = prepared.debugId;
-    const gzipBytes = `decode('${gzipSync(raw).toString('base64')}', 'base64')`;
+    const gzipBytes = gzipSync(raw).toString('base64');
     const input: Record<string, unknown> = {
-      __className__: 'UploadSourceMapInput',
       release,
       fileName,
       gzipBytes,
     };
     if (debugId) input.debugId = debugId;
     try {
-      const result = await transport.call('v1', 'source-maps', { input });
+      const result = await transport.call('v1', 'source-maps', input);
       const id =
         result && typeof result === 'object' && 'id' in result
           ? String((result as { id: unknown }).id)
@@ -124,11 +131,11 @@ export async function uploadSourceMaps(
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const args = [...argv];
-  if (args[0] === 'sourcemaps') args.shift();
-  if (args[0] !== 'upload') {
-    throw new Error('Usage: talaria sourcemaps upload [path]');
+  const command = args.shift();
+  const action = args.shift();
+  if (command !== 'source-maps' || action !== 'upload') {
+    throw new Error('Usage: talaria source-maps upload [path]');
   }
-  args.shift();
   let release: string | undefined;
   let url: string | undefined;
   let apiKey: string | undefined;

@@ -28,11 +28,8 @@ describe('event batch ingest', () => {
         anonymousId: 'anon-evt',
       });
       assert.match(url, /\/v1\/events$/);
-      const input = body!.input as Record<string, unknown>;
-      assert.equal(input.__className__, 'IngestEventBatchInput');
-      const events = input.events as Array<Record<string, unknown>>;
+      const events = body!.events as Array<Record<string, unknown>>;
       assert.equal(events.length, 1);
-      assert.equal(events[0]!.__className__, 'IngestEventInput');
       assert.equal(events[0]!.message, 'hello');
       assert.equal(events[0]!.anonymousId, 'anon-evt');
       assert.equal(events[0]!.environment, undefined);
@@ -61,8 +58,7 @@ describe('event batch ingest', () => {
         { message: 'a' },
         { message: 'b' },
       ]);
-      const input = body!.input as Record<string, unknown>;
-      const events = input.events as Array<Record<string, unknown>>;
+      const events = body!.events as Array<Record<string, unknown>>;
       assert.equal(events.length, 2);
       assert.equal(events[0]!.message, 'a');
       assert.equal(events[1]!.message, 'b');

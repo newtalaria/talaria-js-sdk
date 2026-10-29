@@ -11,7 +11,7 @@ describe('node scope context', () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-      if (String(_input).includes('/events/')) eventBody = body;
+      if (String(_input).includes('/v1/events')) eventBody = body;
       return new Response(JSON.stringify({}), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -22,7 +22,7 @@ describe('node scope context', () => {
     try {
       client.init({
         url: 'http://127.0.0.1:9',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });
@@ -32,7 +32,7 @@ describe('node scope context', () => {
         extra: { requestId: 'r-1' },
       });
       await client.flush();
-      const events = (eventBody!.input as { events: Array<Record<string, unknown>> }).events;
+      const events = (eventBody!.events as Array<Record<string, unknown>>);
       assert.deepEqual(JSON.parse(String(events[0]!.extraJson)), {
         plan: 'pro',
         checkout: { step: 'payment' },
@@ -74,7 +74,7 @@ describe('outgoing HTTP', () => {
       }) as typeof fetch;
       client.init({
         url: 'http://127.0.0.1:9',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });

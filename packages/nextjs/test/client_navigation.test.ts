@@ -66,7 +66,7 @@ describe('initClient navigation listeners', () => {
     try {
       initClient({
         url: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
       });
 
       assert.equal(env.popstate.length, 1);

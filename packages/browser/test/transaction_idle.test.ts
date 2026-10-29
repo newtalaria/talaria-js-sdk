@@ -25,11 +25,9 @@ function pageload(tracer: Tracer): RecordingSpan {
 }
 
 function eventInput(body: Record<string, unknown>): Record<string, unknown> {
-  const raw = body.input as Record<string, unknown>;
-  if (raw.__className__ === 'IngestEventBatchInput') {
-    return (raw.events as Array<Record<string, unknown>>)[0]!;
-  }
-  return raw;
+  const events = body.events as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(events)) return events[0]!;
+  return body;
 }
 
 function installFetchCapture(): { calls: Array<{ url: string; body: Record<string, unknown> }>; restore: () => void } {
@@ -61,7 +59,7 @@ function initTracedClient(): TalariaClient {
   const client = new TalariaClient();
   client.init({
     url: 'http://localhost:8080',
-    apiKey: 'tal_test_test',
+    apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
     remoteConfig: false,
     disableDefaultIntegrations: true,
   });
@@ -147,7 +145,7 @@ describe('client transaction idle and error finalization', () => {
     const spanId = tracer.getSpanId();
 
     await client.close();
-    const event = calls.find((c) => c.url.includes('/events/ingest'));
+    const event = calls.find((c) => c.url.includes('/v1/events'));
     assert.ok(event);
     const input = eventInput(event.body);
     assert.equal(input.traceId, traceId);
@@ -193,7 +191,7 @@ describe('client transaction idle and error finalization', () => {
     assert.equal(tracer.isTransactionOpen(), false);
 
     await client.close();
-    const event = calls.find((c) => c.url.includes('/events/ingest'));
+    const event = calls.find((c) => c.url.includes('/v1/events'));
     assert.ok(event);
     const input = eventInput(event.body);
     assert.equal(input.traceId, traceId);

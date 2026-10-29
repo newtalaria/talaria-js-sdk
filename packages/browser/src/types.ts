@@ -28,11 +28,11 @@ export type FailedRequestStatusCode = number | [number, number];
 
 export interface TalariaInitOptions {
   /**
-   * Talaria API base URL, e.g. `https://ingest.newtalaria.com`.
-   * Defaults to `https://ingest.newtalaria.com`.
+   * Ingest origin override. When omitted, the SDK derives
+   * `https://ingest-<cell>.newtalaria.com` from the `tal_pk_` key.
    */
   url?: string;
-  /** Project API key with `events:write` scope (e.g. `tal_prod_…`). */
+  /** Publishable key (`tal_pk_…`). Browser builds refuse `tal_sk_` and `tal_mon_`. */
   apiKey: string;
   release?: string;
   /**

@@ -40,7 +40,6 @@ export interface IngestEventParams {
 
 function serializeEvent(params: IngestEventParams): Record<string, unknown> {
   const input: Record<string, unknown> = {
-    __className__: 'IngestEventInput',
     message: params.message,
   };
 
@@ -75,7 +74,7 @@ function serializeEvent(params: IngestEventParams): Record<string, unknown> {
 /**
  * Batch-ingest events. The normal path — a single leftover item is still a batch of one.
  *
- * `POST {baseUrl}/v1/events` with `__className__: 'IngestEventBatchInput'`.
+ * `POST {baseUrl}/v1/events` with `{"events":[…]}`.
  */
 export async function ingestEventBatch(
   transport: ServerpodTransport,
@@ -87,12 +86,7 @@ export async function ingestEventBatch(
   return transport.call(
     'v1',
     'events',
-    {
-      input: {
-        __className__: 'IngestEventBatchInput',
-        events: events.map(serializeEvent),
-      },
-    },
+    { events: events.map(serializeEvent) },
     { keepalive },
   );
 }
@@ -107,7 +101,6 @@ export async function ingestEvent(
 
 function serializeBreadcrumb(crumb: Breadcrumb): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'BreadcrumbDto',
     timestamp: crumb.timestamp,
     type: crumb.type,
   };
@@ -120,7 +113,6 @@ function serializeBreadcrumb(crumb: Breadcrumb): Record<string, unknown> {
 
 function serializeException(data: ExceptionData): Record<string, unknown> {
   return {
-    __className__: 'ExceptionDataDto',
     values: data.values.map(serializeExceptionValue),
   };
 }
@@ -129,7 +121,6 @@ function serializeExceptionValue(
   value: ExceptionValue,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'ExceptionValueDto',
   };
   if (value.type != null) out.type = value.type;
   if (value.value != null) out.value = value.value;
@@ -145,7 +136,6 @@ function serializeMechanism(
   mechanism: ExceptionMechanism,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'ExceptionMechanismDto',
     type: mechanism.type,
   };
   if (mechanism.handled != null) out.handled = mechanism.handled;
@@ -155,7 +145,6 @@ function serializeMechanism(
 
 function serializeStackTrace(stack: StackTrace): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'StackTraceDto',
     frames: stack.frames.map(serializeStackFrame),
   };
   if (stack.registers) out.registers = stack.registers;
@@ -164,7 +153,6 @@ function serializeStackTrace(stack: StackTrace): Record<string, unknown> {
 
 function serializeStackFrame(frame: StackFrame): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'StackFrameDto',
   };
   if (frame.filename != null) out.filename = frame.filename;
   if (frame.absPath != null) out.absPath = frame.absPath;
@@ -190,12 +178,10 @@ function serializeStackFrame(frame: StackFrame): Record<string, unknown> {
 
 function serializeDebugMeta(meta: DebugMeta): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'DebugMetaDto',
   };
   if (meta.images) {
     out.images = meta.images.map((image) => {
       const img: Record<string, unknown> = {
-        __className__: 'DebugImageDto',
       };
       if (image.type != null) img.type = image.type;
       if (image.imageAddr != null) img.imageAddr = image.imageAddr;

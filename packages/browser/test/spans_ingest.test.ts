@@ -20,7 +20,7 @@ describe('v1/spans transport', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
       });
       await ingestSpanBatch(transport, [
         {
@@ -44,18 +44,14 @@ describe('v1/spans transport', () => {
       ]);
 
       assert.equal(url, 'http://localhost:8080/v1/spans');
-      assert.equal(url.includes('/events/'), false);
-      const input = body!.input as Record<string, unknown>;
-      assert.equal(input.__className__, 'IngestSpanBatchInput');
-      const spans = input.spans as Array<Record<string, unknown>>;
+      assert.equal(url.includes('/v1/events'), false);
+      const spans = body!.spans as Array<Record<string, unknown>>;
       assert.equal(spans.length, 1);
-      assert.equal(spans[0]!.__className__, 'IngestSpanInput');
       assert.equal(spans[0]!.traceId, 'a'.repeat(32));
       assert.equal(spans[0]!.kind, 'internal');
       assert.equal(spans[0]!.status, 'ok');
       assert.equal(spans[0]!.anonymousId, 'anon-span');
       const events = spans[0]!.events as Array<Record<string, unknown>>;
-      assert.equal(events[0]!.__className__, 'SpanEventDto');
       assert.equal(events[0]!.name, 'lcp');
     } finally {
       globalThis.fetch = originalFetch;
@@ -72,7 +68,7 @@ describe('v1/spans transport', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
       });
       await ingestSpanBatch(transport, []);
       assert.equal(called, false);

@@ -11,7 +11,7 @@ describe('package entry', () => {
 });
 
 describe('TalariaNodeClient', () => {
-  it('sends captureException via events/ingestBatch', async () => {
+  it('sends captureException via POST /v1/events', async () => {
     let url = '';
     let body: Record<string, unknown> | null = null;
     const originalFetch = globalThis.fetch;
@@ -28,7 +28,7 @@ describe('TalariaNodeClient', () => {
       const client = new TalariaNodeClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
         disableDefaultIntegrations: true,
       });
       client.setUser({ id: 'n-1' });
@@ -36,8 +36,7 @@ describe('TalariaNodeClient', () => {
       await client.close();
 
       assert.match(url, /\/v1\/events$/);
-      const input = body!.input as Record<string, unknown>;
-      const events = input.events as Array<Record<string, unknown>>;
+      const events = body!.events as Array<Record<string, unknown>>;
       assert.equal(events[0]!.platform, 'node');
       assert.equal(events[0]!.userId, 'n-1');
       assert.equal(events[0]!.message, 'node boom');

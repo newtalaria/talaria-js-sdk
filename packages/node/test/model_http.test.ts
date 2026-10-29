@@ -58,13 +58,13 @@ describe('model HTTP spans', () => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const body = typeof init?.body === 'string' ? init.body : '';
       if (url.includes('/v1/spans')) {
-        const parsed = JSON.parse(body || '{}') as { input?: { spans?: SpanWire[] } };
-        if (parsed.input?.spans) spanBatches.push(parsed.input.spans);
+        const parsed = JSON.parse(body || '{}') as { spans?: SpanWire[] };
+        if (parsed.spans) spanBatches.push(parsed.spans);
         return jsonResponse({});
       }
       if (url.includes('/v1/events')) {
         eventBatches.push(
-          ((JSON.parse(body) as { input: { events: EventWire[] } }).input.events) ?? [],
+          ((JSON.parse(body) as { events?: EventWire[] }).events) ?? [],
         );
         return jsonResponse({});
       }
@@ -76,7 +76,7 @@ describe('model HTTP spans', () => {
     try {
       client.init({
         url: DSN,
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });
@@ -299,7 +299,7 @@ describe('model HTTP spans', () => {
       assert.ok(recorded.some((span) => span.name === 'GET /health'));
       assert.ok(recorded.some((span) => span.name === 'POST /v1/models'));
       assert.equal(
-        recorded.some((span) => span.kind === 'client' && span.name.includes('ingestBatch')),
+        recorded.some((span) => span.kind === 'client' && span.name.includes('/v1/spans')),
         false,
       );
     });

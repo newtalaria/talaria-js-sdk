@@ -12,7 +12,9 @@ import type {
 } from './types.js';
 import { createId } from './utils/id.js';
 import {
+  assertBrowserCredential,
   readProcessReleaseEnv,
+  resolveIngestUrl,
   resolveReleaseIdentity,
 } from '@newtalaria/core';
 import {
@@ -343,10 +345,12 @@ function normalizeLoggerPresets(
 }
 
 function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
-  const baseUrl = (options.url ?? 'https://ingest.newtalaria.com').trim();
-  if (!options.apiKey?.trim()) {
+  const apiKey = options.apiKey?.trim() ?? '';
+  if (!apiKey) {
     throw new Error('@newtalaria/browser: init requires `apiKey`');
   }
+  assertBrowserCredential(apiKey);
+  const baseUrl = resolveIngestUrl({ apiKey, url: options.url });
   const identity = resolveReleaseIdentity({
     release: options.release,
     commitSha: options.commitSha,
@@ -355,7 +359,7 @@ function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
 
   return {
     baseUrl,
-    apiKey: options.apiKey.trim(),
+    apiKey,
     release: identity.release,
     commitSha: identity.commitSha,
     releaseRefKind: identity.releaseRefKind,
@@ -766,7 +770,7 @@ export class TalariaClient {
 
   /**
    * Apply a project policy document. Production calls this from the cache and
-   * from `sdk/getConfig`. Tests call it with the canonical fixture.
+   * from `GET /v1/sdk-config`. Tests call it with the canonical fixture.
    */
   applySdkConfig(document: SdkConfigDocument): void {
     if (!this.options || document.schemaVersion !== 1) return;

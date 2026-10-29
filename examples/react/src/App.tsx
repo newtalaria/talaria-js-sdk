@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ErrorBoundary, Profiler, Talaria } from '@newtalaria/react';
 
-const url = import.meta.env.VITE_TALARIA_URL || 'https://ingest.newtalaria.com';
-const apiKey = import.meta.env.VITE_TALARIA_API_KEY || '';
+const url = import.meta.env.VITE_TALARIA_URL || 'the host derived from the key';
+const apiKey = import.meta.env.VITE_TALARIA_BROWSER_API_KEY || '';
 
 export function App() {
   const ready = Boolean(apiKey);
@@ -22,7 +22,7 @@ export function App() {
         ) : (
           <>
             Copy <code>.env.example</code> to <code>.env</code> and set{' '}
-            <code>VITE_TALARIA_API_KEY</code>.
+            <code>VITE_TALARIA_BROWSER_API_KEY</code>.
           </>
         )}
       </p>

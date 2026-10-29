@@ -46,7 +46,7 @@ describe('shouldInjectTraceparent', () => {
       false,
     );
     assert.equal(
-      shouldInjectTraceparent('https://api.newtalaria.com/events/ingest', {
+      shouldInjectTraceparent('https://api.newtalaria.com/v1/events', {
         networkErrorOrigins: ['*'],
         pageOrigin: PAGE,
         talariaBaseUrl: 'https://api.newtalaria.com',

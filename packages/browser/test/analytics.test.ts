@@ -46,7 +46,7 @@ describe('browser analytics + identity', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -55,7 +55,7 @@ describe('browser analytics + identity', () => {
       client.analytics.track('product_viewed', { product_id: '123' });
       await client.analytics.flush();
       assert.equal(
-        posts.some((p) => p.url.includes('/analytics/')),
+        posts.some((p) => p.url.includes('/v1/analytics')),
         false,
       );
 
@@ -63,8 +63,7 @@ describe('browser analytics + identity', () => {
       await client.flush();
       const eventPost = posts.find((p) => p.url.includes('/v1/events'));
       assert.ok(eventPost);
-      const input = eventPost.body.input as Record<string, unknown>;
-      const events = input.events as Array<Record<string, unknown>>;
+      const events = eventPost.body.events as Array<Record<string, unknown>>;
       assert.equal(typeof events[0]!.anonymousId, 'string');
       assert.ok(String(events[0]!.anonymousId).length > 0);
       assert.equal(typeof events[0]!.sessionId, 'string');
@@ -79,8 +78,7 @@ describe('browser analytics + identity', () => {
         p.url.includes('/v1/analytics'),
       );
       assert.ok(analyticsPost);
-      const aInput = analyticsPost.body.input as Record<string, unknown>;
-      assert.equal(aInput.__className__, 'IngestAnalyticsEventBatchInput');
+      const aInput = analyticsPost.body;
       const aEvents = aInput.events as Array<Record<string, unknown>>;
       const track = aEvents.find((e) => e.name === 'product_viewed');
       assert.ok(track);
@@ -110,7 +108,7 @@ describe('browser analytics + identity', () => {
       const first = new TalariaClient();
       first.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -123,7 +121,7 @@ describe('browser analytics + identity', () => {
       const second = new TalariaClient();
       second.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -146,10 +144,8 @@ describe('browser analytics + identity', () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/v1/analytics')) {
-        const body = JSON.parse(String(init?.body ?? '{}')) as {
-          input?: { events?: Array<{ name?: string; kind?: string }> };
-        };
-        for (const event of body.input?.events ?? []) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { events?: Array<{ name?: string; kind?: string }> };
+        for (const event of body.events ?? []) {
           names.push(`${event.kind}:${event.name}`);
         }
       }
@@ -163,7 +159,7 @@ describe('browser analytics + identity', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });

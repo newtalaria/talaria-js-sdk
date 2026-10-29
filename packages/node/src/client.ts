@@ -19,6 +19,8 @@ import {
   tombstoneFromError,
   tombstoneIsQuiet,
   writePolicyCache,
+  assertServerCredential,
+  resolveIngestUrl,
   resolveReleaseIdentity,
   type Breadcrumb,
   type CaptureContext,
@@ -40,6 +42,7 @@ const PLATFORM = 'node';
 
 export class TalariaNodeClient {
   private options: (TalariaNodeInitOptions & {
+    apiKey: string;
     baseUrl: string;
     minLevel: SeverityLevel;
     tracingEnabled: boolean;
@@ -66,7 +69,15 @@ export class TalariaNodeClient {
       console.warn('@newtalaria/node: already initialized');
       return;
     }
-    const baseUrl = (raw.url || 'https://ingest.newtalaria.com').replace(/\/+$/, '');
+    const apiKey = (raw.apiKey || process.env.TALARIA_API_KEY || '').trim();
+    if (!apiKey) {
+      throw new Error('@newtalaria/node: init requires `apiKey` or TALARIA_API_KEY');
+    }
+    assertServerCredential(apiKey);
+    const baseUrl = resolveIngestUrl({
+      apiKey,
+      url: raw.url || process.env.TALARIA_URL,
+    });
     const identity = resolveReleaseIdentity({
       release: raw.release,
       commitSha: raw.commitSha,
@@ -79,6 +90,7 @@ export class TalariaNodeClient {
     
     this.options = {
       ...raw,
+      apiKey,
       baseUrl,
       serviceName,
       release: identity.release,
@@ -93,7 +105,7 @@ export class TalariaNodeClient {
     };
     this.transport = new ServerpodTransport({
       baseUrl,
-      apiKey: raw.apiKey,
+      apiKey,
     });
     this.eventQueue = EventIngestQueue.forTransport(this.transport, (error) => {
       console.warn('@newtalaria/node: event ingest failed', error);

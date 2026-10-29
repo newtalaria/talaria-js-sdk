@@ -29,9 +29,11 @@ function mockFetch(
       url: String(input),
       headers: { ...(init?.headers as Record<string, string>) },
       body:
-        typeof body === 'string'
-          ? Buffer.from(body)
-          : Buffer.from(body as Uint8Array),
+        body == null
+          ? Buffer.alloc(0)
+          : typeof body === 'string'
+            ? Buffer.from(body)
+            : Buffer.from(body as Uint8Array),
       keepalive: init?.keepalive,
     };
     seen.push(row);
@@ -154,17 +156,17 @@ describe('ServerpodTransport gzip', () => {
     const t = transport();
     const bytes = new Uint8Array([0x1f, 0x8b, 1, 2, 3]);
     const out = await t.callBinary(
-      '/ingest/v1/replays/segments',
+      '/v1/replays/segments',
       { replayId: 'r', segmentIndex: 2 },
       bytes,
     );
     assert.deepEqual(out, { ok: true });
     const row = seen[0]!;
     const url = new URL(row.url);
-    assert.equal(url.pathname, '/ingest/v1/replays/segments');
+    assert.equal(url.pathname, '/v1/replays/segments');
     assert.equal(url.searchParams.get('segmentIndex'), '2');
     assert.equal(row.headers['Content-Type'], 'application/octet-stream');
-    assert.equal(row.headers['X-API-Key'], 'tal_test_test');
+    assert.equal(row.headers['Authorization'], 'Bearer tal_test_test');
     assert.equal(row.headers['Content-Encoding'], undefined);
     assert.deepEqual([...row.body], [...bytes]);
   });

@@ -57,7 +57,6 @@ export function serializeAnalyticsEvent(
   params: IngestAnalyticsEventParams,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'IngestAnalyticsEventInput',
     name: params.name,
     kind: params.kind,
     anonymousId: params.anonymousId,
@@ -103,8 +102,7 @@ export function serializeAnalyticsEvent(
 /**
  * Batch-ingest product analytics. Parallel path — never mix with events/spans.
  *
- * `POST {baseUrl}/v1/analytics` with
- * `__className__: 'IngestAnalyticsEventBatchInput'`.
+ * `POST {baseUrl}/v1/analytics` with `{"events":[…]}`.
  */
 export async function ingestAnalyticsEventBatch(
   transport: ServerpodTransport,
@@ -115,12 +113,7 @@ export async function ingestAnalyticsEventBatch(
   return transport.call(
     'v1',
     'analytics',
-    {
-      input: {
-        __className__: 'IngestAnalyticsEventBatchInput',
-        events: events.map(serializeAnalyticsEvent),
-      },
-    },
+    { events: events.map(serializeAnalyticsEvent) },
     { keepalive: opts?.keepalive },
   );
 }

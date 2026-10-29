@@ -3,11 +3,9 @@ import { describe, it } from 'node:test';
 import { TalariaClient } from '../src/client.ts';
 
 function eventInput(body: Record<string, unknown> | null): Record<string, unknown> {
-  const input = body!.input as Record<string, unknown>;
-  if (input.__className__ === 'IngestEventBatchInput') {
-    return (input.events as Array<Record<string, unknown>>)[0]!;
-  }
-  return input;
+  const events = body?.events as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(events)) return events[0]!;
+  return body ?? {};
 }
 
 describe('runtime scope APIs', () => {
@@ -26,7 +24,7 @@ describe('runtime scope APIs', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_test_test',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
