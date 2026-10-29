@@ -5,6 +5,8 @@ import {
   normalizeBreadcrumb,
   Scope,
   ServerpodTransport,
+  assertServerCredential,
+  resolveIngestUrl,
   resolveReleaseIdentity,
   readProcessReleaseEnv,
   type Breadcrumb,
@@ -25,9 +27,15 @@ let commitSha: string | undefined;
 let releaseRefKind: 'branch' | 'tag' | undefined;
 
 export function initEdge(options: CoreInitOptions): void {
-  const baseUrl = (options.dsn || options.baseUrl || '').replace(/\/+$/, '');
-  if (!baseUrl) throw new Error('@newtalaria/nextjs/edge: init requires dsn or baseUrl');
-  transport = new ServerpodTransport({ baseUrl, apiKey: options.apiKey });
+  const apiKey = (options.apiKey || '').trim();
+  if (!apiKey) {
+    throw new Error('@newtalaria/nextjs: initEdge requires `apiKey`');
+  }
+  assertServerCredential(apiKey);
+  const envUrl =
+    typeof process !== 'undefined' ? process.env.TALARIA_URL : undefined;
+  const baseUrl = resolveIngestUrl({ apiKey, url: options.url || envUrl });
+  transport = new ServerpodTransport({ baseUrl, apiKey });
   const identity = resolveReleaseIdentity({
     release: options.release,
     commitSha: options.commitSha,

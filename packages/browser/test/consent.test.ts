@@ -40,8 +40,8 @@ function measurementPolicy() {
 function openClient(options?: { publicAnalytics?: boolean }): TalariaClient {
   const client = new TalariaClient();
   client.init({
-    dsn: 'http://localhost:8080',
-    apiKey: 'tal_live_test',
+    url: 'http://localhost:8080',
+    apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
     remoteConfig: false,
     disableDefaultIntegrations: true,
     publicAnalytics: options?.publicAnalytics,
@@ -88,7 +88,7 @@ describe('banner consent', () => {
       client.analytics.track('product_viewed');
       await client.analytics.flush();
       assert.equal(
-        urls.some((url) => url.includes('/analytics/')),
+        urls.some((url) => url.includes('/v1/analytics')),
         false,
       );
 
@@ -97,7 +97,7 @@ describe('banner consent', () => {
       client.analytics.track('product_viewed');
       await client.analytics.flush();
       assert.equal(
-        urls.some((url) => url.includes('/analytics/')),
+        urls.some((url) => url.includes('/v1/analytics')),
         true,
       );
     } finally {
@@ -147,7 +147,7 @@ describe('banner consent', () => {
       await client.captureException(new Error('still captured'));
       await client.flush();
       assert.equal(
-        urls.some((url) => url.includes('/events/ingestBatch')),
+        urls.some((url) => url.includes('/v1/events')),
         true,
       );
     } finally {
@@ -179,7 +179,7 @@ describe('banner consent', () => {
       assert.equal(client.analytics.isEnabled(), true);
       assert.equal(typeof client.getReplayId(), 'string');
       await client.analytics.flush();
-      const grantedPosts = urls.filter((url) => url.includes('/analytics/')).length;
+      const grantedPosts = urls.filter((url) => url.includes('/v1/analytics')).length;
 
       emitter.dispatch('cookieyes_consent_update', {
         accepted: ['necessary'],
@@ -191,7 +191,7 @@ describe('banner consent', () => {
       await client.analytics.flush();
       await Promise.resolve();
       assert.equal(
-        urls.filter((url) => url.includes('/analytics/')).length,
+        urls.filter((url) => url.includes('/v1/analytics')).length,
         grantedPosts,
       );
       const replayPosts = urls.filter((url) => url.includes('/replays/')).length;

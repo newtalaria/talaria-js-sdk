@@ -15,14 +15,12 @@ export async function gzipBytes(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
-/** Encode bytes as a Serverpod ByteData JSON string. */
-export function toServerpodByteData(bytes: Uint8Array): string {
+/** Standard base64 (plain JSON `gzipBytes`, not a Serverpod ByteData wrapper). */
+export function toBase64(bytes: Uint8Array): string {
   let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
-  const b64 = btoa(binary);
-  // Serverpod serializes ByteData as: decode('<base64>', 'base64')
-  return `decode('${b64}', 'base64')`;
+  return btoa(binary);
 }

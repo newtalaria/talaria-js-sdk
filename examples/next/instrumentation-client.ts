@@ -1,9 +1,10 @@
 import { initClient } from '@newtalaria/nextjs/client';
 
-const apiKey = process.env.NEXT_PUBLIC_TALARIA_API_KEY ?? '';
+// Use NEXT_PUBLIC_ prefix per Next.js framework rules
+const apiKey = process.env.NEXT_PUBLIC_TALARIA_BROWSER_API_KEY ?? '';
 if (apiKey) {
   initClient({
-    dsn: process.env.NEXT_PUBLIC_TALARIA_DSN ?? 'https://ingest.newtalaria.com',
+    url: process.env.NEXT_PUBLIC_TALARIA_URL || undefined,
     apiKey,
     remoteConfig: true,
   });

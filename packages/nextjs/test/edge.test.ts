@@ -16,8 +16,8 @@ describe('edge capture', () => {
 
     try {
       initEdge({
-        dsn: 'http://127.0.0.1:9',
-        apiKey: 'tal_live_test',
+        url: 'http://127.0.0.1:9',
+        apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
         release: 'edge-1',
       });
       setUser({ id: 'user-9' });
@@ -25,7 +25,7 @@ describe('edge capture', () => {
       addBreadcrumb({ type: 'navigation', message: '/checkout' });
       await captureException(new Error('edge boom'));
 
-      const events = (eventBody!.input as { events: Array<Record<string, unknown>> }).events;
+      const events = (eventBody!.events as Array<Record<string, unknown>>);
       const event = events[0]!;
       assert.equal(event.userId, 'user-9');
       assert.equal(event.release, 'edge-1');

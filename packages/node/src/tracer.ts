@@ -289,7 +289,7 @@ export class NodeTracer {
       await ingestSpanBatch(this.options.transport, payload, opts);
     } catch (error) {
       for (const span of ready) span.data.flushed = false;
-      console.warn('@newtalaria/node: spans/ingestBatch failed', error);
+      console.warn('@newtalaria/node: POST /v1/spans failed', error);
       if (IngestError.fromUnknown(error).isPermanent) {
         this.disabled = true;
         this.options.onPermanentIngestError?.(error);

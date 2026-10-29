@@ -1,6 +1,6 @@
 import type { ServerpodTransport } from './serverpod.js';
 import { isMissingBinaryRoute } from './replays.js';
-import { toServerpodByteData } from '../utils/gzip.js';
+import { toBase64 } from '../utils/gzip.js';
 
 /** Server rejects more than 50 pageviews or 1000 clicks in one batch. */
 export const MAX_HEATMAP_PAGEVIEWS_PER_BATCH = 50;
@@ -60,7 +60,6 @@ export interface HeatmapBatchResult {
 
 function serializeClick(c: HeatmapClickParams): Record<string, unknown> {
   return {
-    __className__: 'IngestHeatmapClickInput',
     clickIndex: c.clickIndex,
     occurredAt: c.occurredAt,
     selector: c.selector,
@@ -79,7 +78,6 @@ export function serializeHeatmapPageView(
   p: HeatmapPageViewParams,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'IngestHeatmapPageViewInput',
     pageViewId: p.pageViewId,
     anonymousId: p.anonymousId,
     sessionId: p.sessionId,
@@ -183,7 +181,7 @@ export function parseHeatmapBatchResponse(raw: unknown): HeatmapBatchResult {
 }
 
 /**
- * `POST {baseUrl}/heatmaps/ingestBatch`. Parallel to analytics — uses the
+ * `POST {baseUrl}/v1/heatmaps`. Parallel to analytics — uses the
  * `analyticsWrite` key scope and follows analytics consent.
  */
 export async function ingestHeatmapBatch(
@@ -192,14 +190,9 @@ export async function ingestHeatmapBatch(
   opts?: { keepalive?: boolean },
 ): Promise<HeatmapBatchResult> {
   const raw = await transport.call(
+    'v1',
     'heatmaps',
-    'ingestBatch',
-    {
-      input: {
-        __className__: 'IngestHeatmapBatchInput',
-        pageViews: pageViews.map(serializeHeatmapPageView),
-      },
-    },
+    { pageViews: pageViews.map(serializeHeatmapPageView) },
     { keepalive: opts?.keepalive },
   );
   return parseHeatmapBatchResponse(raw);
@@ -214,12 +207,12 @@ export interface HeatmapSnapshotParams {
   capturedAt: string;
 }
 
-export const HEATMAP_SNAPSHOTS_PATH = '/ingest/v1/heatmaps/snapshots';
+export const HEATMAP_SNAPSHOTS_PATH = '/v1/heatmaps/snapshots';
 
 /**
  * Upload a snapshot for a server-requested pageview: raw gzip to
- * `/ingest/v1/heatmaps/snapshots` when the server advertises
- * `binaryUploads`, else `POST {baseUrl}/heatmaps/uploadSnapshot` (base64).
+ * `/v1/heatmaps/snapshots` when the server advertises
+ * `binaryUploads`, else `POST {baseUrl}/v1/heatmaps/snapshots` (base64).
  */
 export async function uploadHeatmapSnapshot(
   transport: ServerpodTransport,
@@ -227,7 +220,7 @@ export async function uploadHeatmapSnapshot(
 ): Promise<unknown> {
   if (params.gzip.length > MAX_HEATMAP_SNAPSHOT_BYTES) {
     throw new Error(
-      `Talaria heatmaps/uploadSnapshot skipped: snapshot exceeds ${MAX_HEATMAP_SNAPSHOT_BYTES} bytes`,
+      `Talaria v1/heatmaps/snapshots skipped: snapshot exceeds ${MAX_HEATMAP_SNAPSHOT_BYTES} bytes`,
     );
   }
   if (transport.capabilities.binaryUploads) {
@@ -248,15 +241,12 @@ export async function uploadHeatmapSnapshot(
       transport.disableBinaryUploads();
     }
   }
-  return transport.call('heatmaps', 'uploadSnapshot', {
-    input: {
-      __className__: 'UploadHeatmapSnapshotInput',
-      pageViewId: params.pageViewId,
-      gzipBytes: toServerpodByteData(params.gzip),
-      viewportWidth: params.viewportWidth,
-      viewportHeight: params.viewportHeight,
-      documentHeight: params.documentHeight,
-      capturedAt: params.capturedAt,
-    },
+  return transport.call('v1/heatmaps', 'snapshots', {
+    pageViewId: params.pageViewId,
+    gzipBytes: toBase64(params.gzip),
+    viewportWidth: params.viewportWidth,
+    viewportHeight: params.viewportHeight,
+    documentHeight: params.documentHeight,
+    capturedAt: params.capturedAt,
   });
 }

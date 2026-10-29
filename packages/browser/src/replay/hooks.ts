@@ -249,10 +249,10 @@ export function buildFailedRequestIgnoreUrls(
   }
   // Relative or absolute Talaria RPC paths
   ignore.push(
-    '/events/ingest',
-    '/events/ingestBatch',
-    '/replays/',
-    '/spans/',
+    '/v1/events',
+    '/v1/replays',
+    '/v1/spans',
+    '/v1/analytics',
   );
   return ignore;
 }

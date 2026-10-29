@@ -5,7 +5,7 @@ const USAGE = `Usage: talaria-nextjs upload [--dir .] [--dist-dir .next] [--rele
        [--url URL] [--api-key KEY] [--project-id ID] [--previous-commit SHA] [--keep-maps]
 
 Creates the release with its commits, uploads .next/static source maps as _next/static/...,
-then deletes the public .map files (unless --keep-maps). Env: TALARIA_RELEASE_KEY, TALARIA_BASE_URL,
+then deletes the public .map files (unless --keep-maps). Env: TALARIA_RELEASE_KEY, TALARIA_URL,
 TALARIA_PROJECT_ID, TALARIA_RELEASE, VERCEL_GIT_COMMIT_SHA / GITHUB_SHA / ... or git.`;
 
 export async function main(argv: string[]): Promise<number> {

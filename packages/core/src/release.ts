@@ -87,7 +87,7 @@ function fromCi(env: ReleaseEnv): ReleaseIdentity {
   if (githubRef && githubSha && githubSha.length >= 7) {
     const type = nonEmpty(env.GITHUB_REF_TYPE);
     return {
-      release: `${githubRef}@${githubSha.slice(0, 7)}`,
+      release: releaseName(githubRef, githubSha),
       commitSha: githubSha,
       releaseRefKind: type === 'tag' || type === 'branch' ? type : undefined,
     };
@@ -97,13 +97,18 @@ function fromCi(env: ReleaseEnv): ReleaseIdentity {
   const gitlabSha = nonEmpty(env.CI_COMMIT_SHA);
   if (gitlabRef && gitlabSha && gitlabSha.length >= 7) {
     return {
-      release: `${gitlabRef}@${gitlabSha.slice(0, 7)}`,
+      release: releaseName(gitlabRef, gitlabSha),
       commitSha: gitlabSha,
       releaseRefKind: nonEmpty(env.CI_COMMIT_TAG) ? 'tag' : 'branch',
     };
   }
 
   return {};
+}
+
+/** M11: `/` in a ref becomes `-` so the release matches `^[A-Za-z0-9][A-Za-z0-9._+@-]{0,199}$`. */
+function releaseName(ref: string, sha: string): string {
+  return `${ref.replaceAll('/', '-')}@${sha.slice(0, 7)}`;
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

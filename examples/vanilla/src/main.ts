@@ -1,13 +1,13 @@
 import { Talaria } from '@newtalaria/browser';
 import './style.css';
 
-const dsn = import.meta.env.VITE_TALARIA_DSN || 'https://ingest.newtalaria.com';
-const apiKey = import.meta.env.VITE_TALARIA_API_KEY || '';
+const url = import.meta.env.VITE_TALARIA_URL || 'the host derived from the key';
+const apiKey = import.meta.env.VITE_TALARIA_BROWSER_API_KEY || '';
 const ready = Boolean(apiKey);
 
 if (ready) {
   Talaria.init({
-    dsn,
+    url,
     apiKey,
     remoteConfig: true,
   });
@@ -25,8 +25,8 @@ app.innerHTML = `
     <p class="status ${ready ? '' : 'warn'}">
       ${
         ready
-          ? `Sending to <code>${dsn}</code>.`
-          : 'Copy <code>.env.example</code> to <code>.env</code> and set <code>VITE_TALARIA_API_KEY</code>.'
+          ? `Sending to <code>${url}</code>.`
+          : 'Copy <code>.env.example</code> to <code>.env</code> and set <code>VITE_TALARIA_BROWSER_API_KEY</code>.'
       }
     </p>
     <div class="actions">

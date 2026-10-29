@@ -27,7 +27,7 @@ describe('resolveReleaseIdentity', () => {
         GITHUB_REF_TYPE: 'branch',
       },
     });
-    assert.equal(resolved.release, 'feature/new-checkout@f32a991');
+    assert.equal(resolved.release, 'feature-new-checkout@f32a991');
     assert.equal(resolved.commitSha, 'f32a991e4b6d8901234567890abcdef123456789');
     assert.equal(resolved.releaseRefKind, 'branch');
   });

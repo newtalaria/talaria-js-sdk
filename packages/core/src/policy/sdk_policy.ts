@@ -133,19 +133,19 @@ export async function fetchSdkConfig(
   },
 ): Promise<SdkConfigDocument> {
   const input: Record<string, unknown> = {
-    __className__: 'GetSdkConfigInput',
     schemaVersion: SDK_CONFIG_SCHEMA,
     sdkName: args.sdkName,
     sdkVersion: args.sdkVersion,
     platform: args.platform,
   };
   if (args.revision) input.revision = args.revision;
-  const response = await transport.call('sdk', 'getConfig', { input }, {
+  const response = await transport.call('v1', 'sdk-config', input, {
+    method: 'GET',
     signal: AbortSignal.timeout(2000),
   });
   const document = parseSdkConfig(response);
   if (!document) {
-    throw new Error('Talaria sdk/getConfig returned an unreadable document');
+    throw new Error('Talaria GET /v1/sdk-config returned an unreadable document');
   }
   // Full and `unchanged` responses both carry capabilities; a server that
   // sends none (older) turns gzip and binary uploads off.
@@ -158,16 +158,12 @@ export async function reportDiscards(
   discards: Array<{ signal: string; reason: string; count: number }>,
 ): Promise<void> {
   if (discards.length === 0) return;
-  await transport.call('sdk', 'reportDiscards', {
-    input: {
-      __className__: 'ReportSdkDiscardsInput',
-      discards: discards.map((row) => ({
-        __className__: 'SdkDiscardCountInput',
-        signal: row.signal,
-        reason: row.reason,
-        count: row.count,
-      })),
-    },
+  await transport.call('v1', 'client-reports', {
+    reports: discards.map((row) => ({
+      signal: row.signal,
+      reason: row.reason,
+      count: row.count,
+    })),
   });
 }
 

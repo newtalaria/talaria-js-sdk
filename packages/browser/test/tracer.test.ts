@@ -8,7 +8,7 @@ function makeTracer(sampleRate = 1): Tracer {
   return new Tracer({
     transport: new ServerpodTransport({
       baseUrl: 'http://localhost:8080',
-      apiKey: 'tal_live_test',
+      apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
     }),
     sampleRate,
     resource: { 'service.name': 'test' },

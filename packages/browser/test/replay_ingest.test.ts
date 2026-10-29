@@ -295,16 +295,16 @@ describe('lifecycle', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
       });
       await client.close();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -332,8 +332,8 @@ describe('event ↔ replay link after finish', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 1,
         replaysErrorAfterMs: 15_000,
@@ -380,15 +380,18 @@ describe('permanent ingest circuit breaker', () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/events/ingest')) {
+      if (url.includes('/v1/events')) {
         ingestCalls += 1;
         return new Response(
           JSON.stringify({
-            __className__: 'ApiUnauthorizedException',
-            message: 'Invalid API key',
-            retry: false,
+            type: 'about:blank',
+            title: 'Unauthorized',
+            status: 401,
+            detail: 'Invalid API key',
+            code: 'invalid_key',
+            requestId: 'req_test',
           }),
-          { status: 400, headers: { 'content-type': 'application/json' } },
+          { status: 401, headers: { 'content-type': 'application/problem+json' } },
         );
       }
       return new Response(JSON.stringify({}), {
@@ -406,8 +409,8 @@ describe('permanent ingest circuit breaker', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -439,15 +442,18 @@ describe('permanent ingest circuit breaker', () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/events/ingest')) {
+      if (url.includes('/v1/events')) {
         ingestCalls += 1;
         return new Response(
           JSON.stringify({
-            className: 'ApiConflictException',
-            message: 'quota exceeded',
-            retry: true,
+            type: 'about:blank',
+            title: 'Too Many Requests',
+            status: 429,
+            detail: 'quota exceeded',
+            code: 'quota_exceeded',
+            requestId: 'req_quota',
           }),
-          { status: 400, headers: { 'content-type': 'application/json' } },
+          { status: 429, headers: { 'content-type': 'application/problem+json' } },
         );
       }
       return new Response(JSON.stringify({}), {
@@ -459,8 +465,8 @@ describe('permanent ingest circuit breaker', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -483,7 +489,7 @@ describe('permanent ingest circuit breaker', () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/events/ingest')) {
+      if (url.includes('/v1/events')) {
         ingestCalls += 1;
         return new Response('unavailable', { status: 503 });
       }
@@ -496,8 +502,8 @@ describe('permanent ingest circuit breaker', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -563,17 +569,17 @@ describe('replay segment batch + breadcrumbs', () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       urls.push(url);
-      if (url.includes('/events/ingest') && typeof init?.body === 'string') {
+      if (url.includes('/v1/events') && typeof init?.body === 'string') {
         eventBodies.push(JSON.parse(init.body) as Record<string, unknown>);
       }
-      if (url.includes('/replays/ingestSegmentBatch')) {
+      if (url.includes('/v1/replays/segments')) {
         let acceptedCount = 12;
         if (typeof init?.body === 'string') {
           try {
             const parsed = JSON.parse(init.body) as {
-              input?: { segments?: unknown[] };
+              segments?: unknown[];
             };
-            acceptedCount = parsed.input?.segments?.length ?? 12;
+            acceptedCount = parsed.segments?.length ?? 12;
           } catch {
             // ignore
           }
@@ -604,13 +610,13 @@ describe('replay segment batch + breadcrumbs', () => {
     };
   }
 
-  it('uploads an error clip as one ingestSegmentBatch POST', async () => {
+  it('uploads an error clip as one v1/replays/segments POST', async () => {
     const { urls, restore } = collectCalls();
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });
@@ -632,10 +638,10 @@ describe('replay segment batch + breadcrumbs', () => {
       await client.close();
 
       const batchCalls = urls.filter((u) =>
-        u.includes('/replays/ingestSegmentBatch'),
+        u.includes('/v1/replays/segments'),
       );
       const singleCalls = urls.filter((u) =>
-        u.endsWith('/replays/ingestSegment'),
+        u.endsWith('/v1/replays/segments') && u.includes('segmentIndex='),
       );
       assert.ok(batchCalls.length >= 1, `expected batch upload, got ${urls.join(', ')}`);
       assert.equal(singleCalls.length, 0);
@@ -649,8 +655,8 @@ describe('replay segment batch + breadcrumbs', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 1,
         disableDefaultIntegrations: true,
@@ -664,33 +670,24 @@ describe('replay segment batch + breadcrumbs', () => {
       await client.captureException(new Error('boom'));
       await client.flush();
 
-      const ingest = eventBodies.find((body) => {
-        const input = body.input as Record<string, unknown> | undefined;
-        return (
-          input?.__className__ === 'IngestEventInput' ||
-          input?.__className__ === 'IngestEventBatchInput'
-        );
-      });
-      assert.ok(ingest, 'expected events/ingest body');
-      const raw = ingest!.input as Record<string, unknown>;
-      const input =
-        raw.__className__ === 'IngestEventBatchInput'
-          ? ((raw.events as Array<Record<string, unknown>>)[0] ?? {})
-          : raw;
+      const ingest = eventBodies.find((body) => Array.isArray(body.events));
+      assert.ok(ingest, 'expected POST /v1/events body');
+      const input = ((ingest!.events as Array<Record<string, unknown>>)[0] ??
+        {}) as Record<string, unknown>;
       const crumbs = (input.breadcrumbs as Array<{ message?: string }>) ?? [];
       assert.ok(
         crumbs.some((c) => c.message === 'user click'),
         'kept pre-error breadcrumb',
       );
       assert.equal(
-        crumbs.some((c) => (c.message ?? '').includes('/replays/')),
+        crumbs.some((c) => (c.message ?? '').includes('/v1/replays/')),
         false,
         'did not attach replay ingest breadcrumbs',
       );
 
       const leftover = anyClient.breadcrumbs.snapshot();
       assert.equal(
-        leftover.some((c) => (c.message ?? '').includes('/replays/')),
+        leftover.some((c) => (c.message ?? '').includes('/v1/replays/')),
         false,
         'did not record Talaria replay URLs into the live breadcrumb buffer',
       );

@@ -60,7 +60,7 @@ function segment(i: number) {
 function transport(caps?: Record<string, boolean>) {
   const t = new ServerpodTransport({
     baseUrl: 'https://ingest.example.com',
-    apiKey: 'tal_live_test',
+    apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
   });
   if (caps) t.setCapabilities(caps);
   return t;
@@ -70,8 +70,12 @@ describe('replay segments', () => {
   it('old servers get the base64 RPC (no capability)', async () => {
     const seen = mockFetch();
     await ingestReplaySegment(transport(), segment(0));
-    assert.equal(seen[0]!.url.pathname, '/replays/ingestSegment');
-    assert.match(seen[0]!.body.toString(), /decode\('/);
+    assert.equal(seen[0]!.url.pathname, '/v1/replays/segments');
+    const rpc = JSON.parse(seen[0]!.body.toString()) as {
+      segments: Array<{ gzipBytes: string }>;
+    };
+    assert.match(rpc.segments[0]!.gzipBytes, /^[A-Za-z0-9+/=]+$/);
+    assert.equal(rpc.segments[0]!.gzipBytes.includes("decode('"), false);
   });
 
   it('binaryUploads: raw gzip to the binary route, no base64', async () => {
@@ -95,23 +99,26 @@ describe('replay segments', () => {
       ...segment(0),
       keepalive: true,
     });
-    assert.equal(seen[0]!.url.pathname, '/replays/ingestSegment');
+    assert.equal(seen[0]!.url.pathname, '/v1/replays/segments');
     assert.equal(seen[0]!.headers['Content-Encoding'], undefined);
   });
 
   it('a 404 from the binary route falls back to RPC and stays there', async () => {
-    const seen = mockFetch((row) =>
-      row.url.pathname.startsWith('/ingest/') ? 404 : 200,
-    );
+    const seen = mockFetch((row) => {
+      // Binary uploads have raw bytes, RPC has JSON
+      const isBinary = row.url.pathname === REPLAY_SEGMENTS_PATH && 
+                       !row.body.toString().startsWith('{');
+      return isBinary ? 404 : 200;
+    });
     const t = transport({ binaryUploads: true });
     await ingestReplaySegment(t, segment(0));
     assert.deepEqual(
       seen.map((r) => r.url.pathname),
-      [REPLAY_SEGMENTS_PATH, '/replays/ingestSegment'],
+      [REPLAY_SEGMENTS_PATH, '/v1/replays/segments'],
     );
     assert.equal(t.capabilities.binaryUploads, false);
     await ingestReplaySegment(t, segment(1));
-    assert.equal(seen.at(-1)!.url.pathname, '/replays/ingestSegment');
+    assert.equal(seen.at(-1)!.url.pathname, '/v1/replays/segments');
   });
 
   it('a 429 from the binary route is a real error, not a fallback', async () => {
@@ -136,16 +143,19 @@ describe('replay segments', () => {
   });
 
   it('batch falls back to the batch RPC when the route is missing', async () => {
-    const seen = mockFetch((row) =>
-      row.url.pathname.startsWith('/ingest/') ? 405 : 200,
-    );
+    const seen = mockFetch((row) => {
+      // Binary uploads have raw bytes, RPC has JSON
+      const isBinary = row.url.pathname === REPLAY_SEGMENTS_PATH && 
+                       !row.body.toString().startsWith('{');
+      return isBinary ? 405 : 200;
+    });
     await ingestReplaySegmentBatch(transport({ binaryUploads: true }), [
       segment(0),
       segment(1),
     ]);
     assert.deepEqual(
       seen.map((r) => r.url.pathname),
-      [REPLAY_SEGMENTS_PATH, '/replays/ingestSegmentBatch'],
+      [REPLAY_SEGMENTS_PATH, '/v1/replays/segments'],
     );
   });
 });
@@ -168,9 +178,9 @@ describe('heatmap snapshot', () => {
     assert.deepEqual([...seen[0]!.body], [...gz]);
   });
 
-  it('without the capability it uses heatmaps/uploadSnapshot', async () => {
+  it('without the capability it uses v1/heatmaps/snapshots RPC', async () => {
     const seen = mockFetch();
     await uploadHeatmapSnapshot(transport(), params);
-    assert.equal(seen[0]!.url.pathname, '/heatmaps/uploadSnapshot');
+    assert.equal(seen[0]!.url.pathname, '/v1/heatmaps/snapshots');
   });
 });

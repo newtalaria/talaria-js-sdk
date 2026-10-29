@@ -13,8 +13,7 @@ import { createRoot } from 'react-dom/client';
 import { Talaria, ErrorBoundary, reactErrorHandler } from '@newtalaria/react';
 
 Talaria.init({
-  dsn: 'https://ingest.newtalaria.com',
-  apiKey: 'tal_live_…',
+  apiKey: 'tal_pk_prod_nz1_…',
 });
 
 const root = createRoot(document.getElementById('root')!, {

@@ -13,8 +13,7 @@ import http from 'node:http';
 import { Talaria, handleHttpRequest } from '@newtalaria/node';
 
 Talaria.init({
-  dsn: 'https://ingest.newtalaria.com',
-  apiKey: process.env.TALARIA_API_KEY!,
+  apiKey: process.env.TALARIA_API_KEY!, // tal_sk_…
   remoteConfig: true,
 });
 

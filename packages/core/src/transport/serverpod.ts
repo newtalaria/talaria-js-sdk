@@ -6,7 +6,7 @@ export interface ServerpodTransportOptions {
 }
 
 /**
- * Wire features the server advertised in `sdk/getConfig`
+ * Wire features the server advertised on `GET /v1/sdk-config`
  * (`capabilities`). Both default to off, so an older server never sees a
  * gzip body or a binary upload.
  */
@@ -15,7 +15,7 @@ export interface ServerCapabilities {
   gzipRequests: boolean;
   /**
    * Replay segments and heatmap snapshots may be POSTed as raw gzip to
-   * `/ingest/v1/replays/segments` and `/ingest/v1/heatmaps/snapshots`.
+   * `/v1/replays/segments` and `/v1/heatmaps/snapshots`.
    */
   binaryUploads: boolean;
 }
@@ -30,11 +30,13 @@ export interface CallOptions {
    */
   keepalive?: boolean;
   signal?: AbortSignal;
+  /** HTTP method override (default: POST) */
+  method?: 'GET' | 'POST' | 'PUT';
 }
 
 /**
- * Minimal Serverpod RPC client: POST `{baseUrl}/{endpoint}/{method}` with
- * named JSON parameters and API-key auth.
+ * JSON client: `{baseUrl}/{endpoint}/{method}` with `Authorization: Bearer`.
+ * Bodies are plain JSON. Batch routes use `{"<plural>":[…]}`.
  *
  * Uses global `fetch` (browsers and Node 18+). Never wrap this client with
  * tracing middleware — that would trace Talaria's own transport.
@@ -85,7 +87,29 @@ export class ServerpodTransport {
     body: Record<string, unknown>,
     opts?: CallOptions,
   ): Promise<unknown> {
-    const url = `${this.baseUrl}/${endpoint}/${method}`;
+    const path = [endpoint, method].filter((part) => part.length > 0).join('/');
+    let url = `${this.baseUrl}/${path}`;
+    const label = path;
+
+    if (opts?.method === 'GET') {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(body)) {
+        if (value === undefined || value === null) continue;
+        if (Array.isArray(value)) params.set(key, value.join(','));
+        else if (typeof value === 'object') params.set(key, JSON.stringify(value));
+        else params.set(key, String(value));
+      }
+      const query = params.toString();
+      if (query) url += `?${query}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+        credentials: 'omit',
+        signal: opts.signal,
+      });
+      return this.read(response, label);
+    }
+
     const json = JSON.stringify(body);
     let gzipped = false;
     let payload: string | Uint8Array = json;
@@ -104,12 +128,12 @@ export class ServerpodTransport {
       this.caps = { ...this.caps, gzipRequests: false };
       response = await fetch(url, this.init(json, false, opts));
     }
-    return this.read(response, `${endpoint}/${method}`);
+    return this.read(response, label);
   }
 
   /**
    * POST raw bytes to a binary upload route (`path` like
-   * `/ingest/v1/replays/segments`) with the small fields as query
+   * `/v1/replays/segments`) with the small fields as query
    * parameters. Callers check `capabilities.binaryUploads` first.
    */
   async callBinary(
@@ -128,7 +152,7 @@ export class ServerpodTransport {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
-        'X-API-Key': this.apiKey,
+        Authorization: `Bearer ${this.apiKey}`,
       },
       body: copy,
       credentials: 'omit',
@@ -145,11 +169,11 @@ export class ServerpodTransport {
   ): RequestInit {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json; charset=utf-8',
-      'X-API-Key': this.apiKey,
+      Authorization: `Bearer ${this.apiKey}`,
     };
     if (gzipped) headers['Content-Encoding'] = 'gzip';
     const init: RequestInit = {
-      method: 'POST',
+      method: opts?.method || 'POST',
       headers,
       body,
       credentials: 'omit',
@@ -168,10 +192,10 @@ export class ServerpodTransport {
       const text = await response.text().catch(() => '');
       const parsed = IngestError.parse(text);
       let detail = text.slice(0, 400);
-      const className = parsed.className;
+      const code = parsed.code ?? parsed.className;
       const message = parsed.message;
-      if (className || message) {
-        detail = [className, message].filter(Boolean).join(': ');
+      if (code || message) {
+        detail = [code, message].filter(Boolean).join(': ');
       }
       throw new TransportError(
         `Talaria ${label} failed: HTTP ${response.status}${detail ? ` — ${detail}` : ''}`,

@@ -12,7 +12,9 @@ import type {
 } from './types.js';
 import { createId } from './utils/id.js';
 import {
+  assertBrowserCredential,
   readProcessReleaseEnv,
+  resolveIngestUrl,
   resolveReleaseIdentity,
 } from '@newtalaria/core';
 import {
@@ -343,13 +345,12 @@ function normalizeLoggerPresets(
 }
 
 function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
-  const baseUrl = (options.baseUrl ?? options.dsn ?? '').trim();
-  if (!baseUrl) {
-    throw new Error('@newtalaria/browser: init requires `dsn` or `baseUrl`');
-  }
-  if (!options.apiKey?.trim()) {
+  const apiKey = options.apiKey?.trim() ?? '';
+  if (!apiKey) {
     throw new Error('@newtalaria/browser: init requires `apiKey`');
   }
+  assertBrowserCredential(apiKey);
+  const baseUrl = resolveIngestUrl({ apiKey, url: options.url });
   const identity = resolveReleaseIdentity({
     release: options.release,
     commitSha: options.commitSha,
@@ -358,7 +359,7 @@ function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
 
   return {
     baseUrl,
-    apiKey: options.apiKey.trim(),
+    apiKey,
     release: identity.release,
     commitSha: identity.commitSha,
     releaseRefKind: identity.releaseRefKind,
@@ -471,8 +472,8 @@ function isTerminalReplayLimitError(error: unknown): boolean {
 function errorFromBatchFailure(message: string): Error {
   return new Error(
     message
-      ? `Talaria replays/ingestSegmentBatch failed: HTTP 400 — ${message}`
-      : 'Talaria replays/ingestSegmentBatch failed: HTTP 400',
+      ? `Talaria v1/replays/segments failed: HTTP 400 — ${message}`
+      : 'Talaria v1/replays/segments failed: HTTP 400',
   );
 }
 
@@ -769,7 +770,7 @@ export class TalariaClient {
 
   /**
    * Apply a project policy document. Production calls this from the cache and
-   * from `sdk/getConfig`. Tests call it with the canonical fixture.
+   * from `GET /v1/sdk-config`. Tests call it with the canonical fixture.
    */
   applySdkConfig(document: SdkConfigDocument): void {
     if (!this.options || document.schemaVersion !== 1) return;
@@ -2879,7 +2880,7 @@ export class TalariaClient {
     }
 
     this.buffer.prepend(events);
-        console.warn('@newtalaria/browser: replays/ingestSegmentBatch failed', error);
+        console.warn('@newtalaria/browser: v1/replays/segments failed', error);
     if (isPermanentIngestError(error)) {
       this.disableIngestAfterPermanentError(error, 'replay');
       return 'stop';

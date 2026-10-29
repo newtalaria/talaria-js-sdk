@@ -26,7 +26,7 @@ describe('analytics ingest serialization', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       await ingestAnalyticsEventBatch(transport, [
         {
@@ -55,12 +55,9 @@ describe('analytics ingest serialization', () => {
         },
       ]);
 
-      assert.equal(url, 'http://localhost:8080/analytics/ingestBatch');
-      const input = body!.input as Record<string, unknown>;
-      assert.equal(input.__className__, 'IngestAnalyticsEventBatchInput');
-      const events = input.events as Array<Record<string, unknown>>;
+      assert.equal(url, 'http://localhost:8080/v1/analytics');
+      const events = body!.events as Array<Record<string, unknown>>;
       assert.equal(events.length, 1);
-      assert.equal(events[0]!.__className__, 'IngestAnalyticsEventInput');
       assert.equal(events[0]!.name, 'product_viewed');
       assert.equal(events[0]!.kind, 'track');
       assert.equal(events[0]!.anonymousId, 'anon-1');
@@ -92,7 +89,7 @@ describe('analytics ingest serialization', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       await ingestAnalyticsEventBatch(transport, []);
       assert.equal(called, false);
@@ -113,7 +110,6 @@ describe('analytics ingest serialization', () => {
     assert.equal(serialized.propertiesJson, undefined);
     assert.equal(serialized.browserName, undefined);
     assert.equal(serialized.userAgent, undefined);
-    assert.equal(serialized.__className__, 'IngestAnalyticsEventInput');
   });
 });
 
@@ -132,7 +128,7 @@ describe('AnalyticsFacade consent', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const identity = new IdentityStore(createMemoryStorage(), {
         createId: () => 'id-1',

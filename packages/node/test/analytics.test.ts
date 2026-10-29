@@ -17,18 +17,18 @@ describe('TalariaNodeClient analytics', () => {
     try {
       const client = new TalariaNodeClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
         disableDefaultIntegrations: true,
       });
       client.analytics.track('server_event');
       await client.analytics.flush();
-      assert.equal(urls.some((u) => u.includes('/analytics/')), false);
+      assert.equal(urls.some((u) => u.includes('/v1/analytics')), false);
 
       client.analytics.optIn();
       client.analytics.track('server_event', { ok: true }, { userId: 'u-1' });
       await client.analytics.flush();
-      assert.equal(urls.some((u) => u.includes('/analytics/ingestBatch')), true);
+      assert.equal(urls.some((u) => u.includes('/v1/analytics')), true);
       await client.close();
     } finally {
       globalThis.fetch = originalFetch;
@@ -42,8 +42,8 @@ describe('TalariaNodeClient analytics', () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-      if (url.includes('/analytics/')) analyticsBody = body;
-      if (url.includes('/events/')) eventBody = body;
+      if (url.includes('/v1/analytics')) analyticsBody = body;
+      if (url.includes('/v1/events')) eventBody = body;
       return new Response(JSON.stringify({}), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -53,8 +53,8 @@ describe('TalariaNodeClient analytics', () => {
     try {
       const client = new TalariaNodeClient();
       client.init({
-        dsn: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        url: 'http://localhost:8080',
+        apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
         remoteConfig: false,
         disableDefaultIntegrations: true,
         anonymousId: 'node-anon',
@@ -70,13 +70,10 @@ describe('TalariaNodeClient analytics', () => {
       client.analytics.identify('user_123', { plan: 'team' });
       await client.flush();
 
-      const events = (eventBody!.input as { events: Array<Record<string, unknown>> })
-        .events;
+      const events = eventBody!.events as Array<Record<string, unknown>>;
       assert.equal(events[0]!.anonymousId, 'node-anon');
 
-      const aEvents = (
-        analyticsBody!.input as { events: Array<Record<string, unknown>> }
-      ).events;
+      const aEvents = analyticsBody!.events as Array<Record<string, unknown>>;
       const identify = aEvents.find((e) => e.kind === 'identify');
       assert.ok(identify);
       assert.equal(identify.name, '$identify');

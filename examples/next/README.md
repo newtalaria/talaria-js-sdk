@@ -10,7 +10,9 @@ cd talaria-js-sdk/examples/next
 cp .env.example .env.local
 ```
 
-Put a project client key (`tal_live_…`) in `.env.local` as both `NEXT_PUBLIC_TALARIA_API_KEY` and `TALARIA_API_KEY`. Local server: set both DSN values to `http://127.0.0.1:8080`.
+Put a publishable key (`tal_pk_…`) in `.env.local` as `NEXT_PUBLIC_TALARIA_BROWSER_API_KEY` and a secret key (`tal_sk_…`) as `TALARIA_API_KEY`. Omit the URL variables to use `https://ingest-<cell>.newtalaria.com`. For a local server set `NEXT_PUBLIC_TALARIA_URL` and `TALARIA_URL` to `http://127.0.0.1:8080`. Never prefix `TALARIA_API_KEY` or `TALARIA_RELEASE_KEY` with `NEXT_PUBLIC_`.
+
+**SECURITY**: Never use `NEXT_PUBLIC_` prefix with `TALARIA_API_KEY` or `TALARIA_RELEASE_KEY` — these are server-only secrets.
 
 ```bash
 npm install

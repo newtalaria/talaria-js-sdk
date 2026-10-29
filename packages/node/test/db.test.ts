@@ -19,8 +19,8 @@ const tracingOn: SdkConfigDocument = {
 function client(): TalariaNodeClient {
   const subject = new TalariaNodeClient();
   subject.init({
-    dsn: 'http://localhost:8080',
-    apiKey: 'tal_live_test',
+    url: 'http://localhost:8080',
+    apiKey: 'tal_sk_test_nz1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB2zE3yZ',
     disableDefaultIntegrations: true,
     remoteConfig: false,
   });
@@ -38,12 +38,12 @@ async function collected(subject: TalariaNodeClient): Promise<{
   const original = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    const body = JSON.parse(String(init?.body ?? '{}')) as { input?: Record<string, unknown> };
-    const inputBody = body.input ?? {};
-    if (url.includes('/spans/')) {
+    const body = JSON.parse(String(init?.body ?? '{}')) as { spans?: Array<Record<string, unknown>>; events?: Array<Record<string, unknown>> };
+    const inputBody = body;
+    if (url.includes('/v1/spans')) {
       spans.push(...((inputBody.spans as Array<Record<string, unknown>>) ?? []));
     }
-    if (url.includes('/events/')) {
+    if (url.includes('/v1/events')) {
       events.push(...((inputBody.events as Array<Record<string, unknown>>) ?? []));
     }
     return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
@@ -231,9 +231,9 @@ async function flushOnly(subject: TalariaNodeClient): Promise<Array<Record<strin
   const original = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    const body = JSON.parse(String(init?.body ?? '{}')) as { input?: Record<string, unknown> };
-    if (url.includes('/spans/')) {
-      spans.push(...(((body.input ?? {}).spans as Array<Record<string, unknown>>) ?? []));
+    const body = JSON.parse(String(init?.body ?? '{}')) as { spans?: Array<Record<string, unknown>> };
+    if (url.includes('/v1/spans')) {
+      spans.push(...(body.spans ?? []));
     }
     return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
   }) as typeof fetch;

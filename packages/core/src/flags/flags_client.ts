@@ -32,7 +32,7 @@ export interface FlagsClientOptions {
 }
 
 /**
- * Feature-flag evaluate client (`POST /flags/evaluate`).
+ * Feature-flag evaluate client (`POST /v1/flags/evaluate`).
  *
  * Typed variation helpers always take a required default. When policy
  * `flags.enabled` is off, network is skipped and defaults are returned.

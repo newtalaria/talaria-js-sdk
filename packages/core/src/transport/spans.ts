@@ -39,7 +39,7 @@ export interface IngestSpanParams {
 /**
  * Batch-ingest spans. Never mix with events — spans are a parallel path.
  *
- * `POST {baseUrl}/spans/ingestBatch` with `__className__: 'IngestSpanBatchInput'`.
+ * `POST {baseUrl}/v1/spans` with `{"spans":[…]}`.
  */
 export async function ingestSpanBatch(
   transport: ServerpodTransport,
@@ -47,20 +47,16 @@ export async function ingestSpanBatch(
   opts?: { keepalive?: boolean },
 ): Promise<unknown> {
   if (spans.length === 0) return undefined;
-
-  const input: Record<string, unknown> = {
-    __className__: 'IngestSpanBatchInput',
-    spans: spans.map(serializeSpan),
-  };
-
-  return transport.call('spans', 'ingestBatch', { input }, {
-    keepalive: opts?.keepalive,
-  });
+  return transport.call(
+    'v1',
+    'spans',
+    { spans: spans.map(serializeSpan) },
+    { keepalive: opts?.keepalive },
+  );
 }
 
 function serializeSpan(span: IngestSpanParams): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'IngestSpanInput',
     traceId: span.traceId,
     spanId: span.spanId,
     name: span.name,
@@ -94,7 +90,6 @@ function serializeSpan(span: IngestSpanParams): Record<string, unknown> {
 
 function serializeSpanEvent(event: SpanEventInput): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    __className__: 'SpanEventDto',
     timestamp: event.timestamp,
     name: event.name,
   };
@@ -106,7 +101,6 @@ function serializeSpanEvent(event: SpanEventInput): Record<string, unknown> {
 
 function serializeSpanLink(link: SpanLinkInput): Record<string, unknown> {
   return {
-    __className__: 'SpanLinkDto',
     traceId: link.traceId,
     spanId: link.spanId,
   };

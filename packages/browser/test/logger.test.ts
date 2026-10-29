@@ -5,15 +5,11 @@ import { policyDocument } from './policy_fixture.ts';
 import type { BeforeSendEvent } from '../src/types.ts';
 
 type IngestBody = {
-  input?: Record<string, unknown>;
+  events?: Array<Record<string, unknown>>;
 };
 
 function eventsIn(body: IngestBody): Array<Record<string, unknown>> {
-  const input = body.input ?? {};
-  if (input.__className__ === 'IngestEventBatchInput') {
-    return (input.events as Array<Record<string, unknown>>) ?? [];
-  }
-  return Object.keys(input).length ? [input] : [];
+  return body.events ?? [];
 }
 
 function sentEvents(bodies: IngestBody[]): Array<Record<string, unknown>> {
@@ -32,7 +28,7 @@ function installFetchCapture(): {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(_input);
-    if (url.includes('/events/')) {
+    if (url.includes('/v1/events')) {
       bodies.push(JSON.parse(String(init?.body ?? '{}')) as IngestBody);
     }
     return new Response(JSON.stringify({}), {
@@ -53,8 +49,8 @@ function initClient(
 ): TalariaClient {
   const client = new TalariaClient();
   client.init({
-    dsn: 'http://localhost:8080',
-    apiKey: 'tal_live_test',
+    url: 'http://localhost:8080',
+    apiKey: 'tal_pk_test_nz1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1zu896',
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
     disableDefaultIntegrations: true,

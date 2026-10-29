@@ -31,8 +31,8 @@ export const MAX_SEGMENTS_PER_REPLAY = 200;
  */
 export const MAX_SEGMENTS_ERROR_CLIP = 12;
 /**
- * Max segments in one `replays/ingestSegmentBatch` call.
- * Keep in sync with ReplayLimits.maxSegmentsPerIngestBatch.
+ * Max segments in one `v1/replays/segments` batch call.
+ * Keep in sync with ReplayLimits.maxSegmentsPerBatch.
  */
 export const MAX_SEGMENTS_PER_INGEST_BATCH = MAX_SEGMENTS_ERROR_CLIP;
 /** Error-clip mode: hard compressed-byte budget for the whole clip. */

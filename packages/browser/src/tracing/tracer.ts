@@ -499,7 +499,7 @@ export class Tracer {
       });
     } catch (error) {
       for (const span of ready) span.data.flushed = false;
-      console.warn('@newtalaria/browser: spans/ingestBatch failed', error);
+      console.warn('@newtalaria/browser: v1/spans failed', error);
       if (IngestError.fromUnknown(error).isPermanent) {
         this.disabled = true;
         this.ended.length = 0;

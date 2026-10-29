@@ -1,6 +1,6 @@
 import { TransportError } from '@newtalaria/core';
 import type { ServerpodTransport } from './serverpod.js';
-import { gzipBytes, toServerpodByteData } from '../utils/gzip.js';
+import { gzipBytes, toBase64 } from '../utils/gzip.js';
 import { MAX_COMPRESSED_SEGMENT_BYTES } from '../replay/segment_buffer.js';
 
 export interface StartReplayParams {
@@ -42,7 +42,6 @@ export async function startReplay(
   params: StartReplayParams,
 ): Promise<unknown> {
   const input: Record<string, unknown> = {
-    __className__: 'StartReplayInput',
     replayId: params.replayId,
   };
   if (params.sessionId) input.sessionId = params.sessionId;
@@ -51,12 +50,7 @@ export async function startReplay(
   if (params.userId) input.userId = params.userId;
   if (params.userAgent) input.userAgent = params.userAgent;
 
-  return transport.call(
-    'replays',
-    'start',
-    { input },
-    { keepalive: params.keepalive },
-  );
+  return transport.call('v1', 'replays', input, { keepalive: params.keepalive });
 }
 
 export interface IngestSegmentBatchResult {
@@ -68,10 +62,9 @@ export interface IngestSegmentBatchResult {
 
 function serializeSegmentInput(params: IngestSegmentParams, gzip: Uint8Array) {
   return {
-    __className__: 'IngestReplaySegmentInput',
     replayId: params.replayId,
     segmentIndex: params.segmentIndex,
-    gzipBytes: toServerpodByteData(gzip),
+    gzipBytes: toBase64(gzip),
     eventCount: params.events.length,
     startedAt: params.startedAt.toISOString(),
     endedAt: params.endedAt.toISOString(),
@@ -81,12 +74,12 @@ function serializeSegmentInput(params: IngestSegmentParams, gzip: Uint8Array) {
 function ensureSegmentFits(compressed: Uint8Array, method: string): void {
   if (compressed.length > MAX_COMPRESSED_SEGMENT_BYTES) {
     throw new Error(
-      `Talaria replays/${method} failed: HTTP 400 — segment exceeds max compressed size (${compressed.length} > ${MAX_COMPRESSED_SEGMENT_BYTES})`,
+      `Talaria v1/replays/${method} failed: HTTP 400 — segment exceeds max compressed size (${compressed.length} > ${MAX_COMPRESSED_SEGMENT_BYTES})`,
     );
   }
 }
 
-export const REPLAY_SEGMENTS_PATH = '/ingest/v1/replays/segments';
+export const REPLAY_SEGMENTS_PATH = '/v1/replays/segments';
 
 /**
  * Binary route statuses that mean "this server (or its proxy) doesn't have
@@ -141,9 +134,9 @@ export async function ingestReplaySegment(
   }
 
   return transport.call(
-    'replays',
-    'ingestSegment',
-    { input: serializeSegmentInput(params, compressed) },
+    'v1/replays',
+    'segments',
+    { segments: [serializeSegmentInput(params, compressed)] },
     { keepalive: params.keepalive },
   );
 }
@@ -158,7 +151,7 @@ export async function ingestReplaySegmentBatch(
   opts?: { keepalive?: boolean },
 ): Promise<IngestSegmentBatchResult> {
   if (segments.length === 0) {
-    throw new Error('Talaria replays/ingestSegmentBatch requires segments');
+    throw new Error('Talaria v1/replays/segments requires segments');
   }
 
   const compressedAll: Uint8Array[] = [];
@@ -217,14 +210,9 @@ export async function ingestReplaySegmentBatch(
   );
 
   const raw = await transport.call(
-    'replays',
-    'ingestSegmentBatch',
-    {
-      input: {
-        __className__: 'IngestReplaySegmentBatchInput',
-        segments: serialized,
-      },
-    },
+    'v1/replays',
+    'segments',
+    { segments: serialized },
     { keepalive: opts?.keepalive },
   );
 
@@ -275,15 +263,16 @@ export async function finishReplay(
   params: FinishReplayParams,
 ): Promise<unknown> {
   const input: Record<string, unknown> = {
-    __className__: 'FinishReplayInput',
     replayId: params.replayId,
   };
   if (params.reason) input.reason = params.reason;
 
+  const body: Record<string, unknown> = {};
+  if (params.reason) body.reason = params.reason;
   return transport.call(
-    'replays',
+    `v1/replays/${params.replayId}`,
     'finish',
-    { input },
+    body,
     { keepalive: params.keepalive },
   );
 }

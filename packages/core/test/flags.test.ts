@@ -9,6 +9,7 @@ import {
   createMemoryStorage,
   evaluateFlags,
   flagEvaluationFromWire,
+  listFlagDefinitions,
 } from '../src/index.ts';
 
 function evaluateResponse(args: {
@@ -61,10 +62,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -82,8 +83,7 @@ describe('feature flags client', () => {
 
   it('boolVariation uses evaluate result and stampTags', async () => {
     const restore = installFetch((_url, body) => {
-      const input = body.input as Record<string, unknown>;
-      assert.equal(input.__className__, 'EvaluateFlagsInput');
+      const input = body;
       assert.equal(input.anonymousId, 'anon-1');
       return evaluateResponse({
         key: 'demo-kill-switch',
@@ -96,10 +96,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -139,10 +139,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -172,10 +172,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags1 = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -194,7 +194,7 @@ describe('feature flags client', () => {
         })) as typeof fetch;
 
       const flags2 = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity: new IdentityStore(storage, { initialAnonymousId: 'anon-1' }),
         storage,
         getTransport: () => transport,
@@ -226,10 +226,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -256,16 +256,15 @@ describe('feature flags client', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const result = await evaluateFlags(transport, {
         anonymousId: 'anon_1',
         userId: 'user_1',
         attributes: { plan: 'team' },
       });
-      assert.equal(url, 'http://localhost:8080/flags/evaluate');
-      const input = body!.input as Record<string, unknown>;
-      assert.equal(input.__className__, 'EvaluateFlagsInput');
+      assert.equal(url, 'http://localhost:8080/v1/flags/evaluate');
+      const input = body!;
       assert.equal(input.anonymousId, 'anon_1');
       assert.equal((input.attributes as Record<string, string>).plan, 'team');
       assert.equal((result.evaluations as Array<Record<string, unknown>>)[0]!.key, 'demo');
@@ -276,7 +275,7 @@ describe('feature flags client', () => {
 
   it('emits $feature_flag_called once per key per session', async () => {
     const restore = installFetch((url) => {
-      if (url.includes('/flags/evaluate')) {
+      if (url.includes('/v1/flags')) {
         return evaluateResponse({ key: 'demo', variationKey: 'on', value: true });
       }
       return {};
@@ -287,19 +286,19 @@ describe('feature flags client', () => {
       identity.touchSession();
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const names: string[] = [];
       const originalFetch = globalThis.fetch;
       globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-        if (url.includes('/analytics/ingestBatch')) {
-          const inputBody = body.input as Record<string, unknown>;
+        if (url.includes('/v1/analytics')) {
+          const inputBody = body;
           const events = inputBody.events as Array<Record<string, unknown>>;
           for (const event of events) names.push(String(event.name));
         }
-        if (url.includes('/flags/evaluate')) {
+        if (url.includes('/v1/flags')) {
           return new Response(
             JSON.stringify({
               data: evaluateResponse({ key: 'demo', variationKey: 'on', value: true }),
@@ -331,7 +330,7 @@ describe('feature flags client', () => {
       analytics.optIn();
 
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -378,10 +377,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -393,6 +392,32 @@ describe('feature flags client', () => {
       flags.close();
     } finally {
       restore();
+    }
+  });
+
+  it('lists definitions with GET /v1/flags?keys=', async () => {
+    let url = '';
+    let method = '';
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      url = String(input);
+      method = init?.method ?? 'GET';
+      return new Response(JSON.stringify({ flags: [{ key: 'demo' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+    try {
+      const transport = new ServerpodTransport({
+        baseUrl: 'http://localhost:8080',
+        apiKey: 'tal_test_test',
+      });
+      const result = await listFlagDefinitions(transport, ['demo', 'other']);
+      assert.equal(method, 'GET');
+      assert.equal(url, 'http://localhost:8080/v1/flags?keys=demo%2Cother');
+      assert.equal((result.flags as Array<{ key: string }>)[0]!.key, 'demo');
+    } finally {
+      globalThis.fetch = original;
     }
   });
 });

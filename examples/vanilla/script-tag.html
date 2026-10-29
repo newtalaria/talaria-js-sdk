@@ -22,24 +22,22 @@
     <script src="https://cdn.jsdelivr.net/npm/@newtalaria/browser@0.2.0/dist/talaria.browser.iife.js"></script>
     <script>
       const params = new URLSearchParams(location.search);
-      const dsn =
-        params.get('dsn') ||
-        localStorage.getItem('TALARIA_DSN') ||
-        'https://ingest.newtalaria.com';
+      const url = params.get('url') || localStorage.getItem('TALARIA_URL') || '';
       const apiKey =
-        params.get('apiKey') || localStorage.getItem('TALARIA_API_KEY') || '';
+        params.get('apiKey') || localStorage.getItem('TALARIA_BROWSER_API_KEY') || '';
       const status = document.getElementById('status');
       const ready = Boolean(window.Talaria && apiKey);
       if (ready) {
-        Talaria.init({
-          dsn: dsn,
+        const init = {
           apiKey: apiKey,
           remoteConfig: true,
           replaysOnErrorSampleRate: 1,
-        });
+        };
+        if (url) init.url = url;
+        Talaria.init(init);
         status.className = 'status';
         status.innerHTML =
-          'Sending to <code>' + dsn + '</code>. Pass <code>?apiKey=tal_live_…</code> or set localStorage.';
+          'Sending to <code>' + (url || 'the host derived from the key') + '</code>. Pass <code>?apiKey=tal_pk_…</code>.';
         document.getElementById('exception').disabled = false;
         document.getElementById('message').disabled = false;
         document.getElementById('exception').onclick = function () {
@@ -50,7 +48,7 @@
         };
       } else {
         status.innerHTML =
-          'Set <code>localStorage.TALARIA_API_KEY</code> or open with <code>?apiKey=tal_live_…</code>. The Vite page reads <code>.env</code> instead.';
+          'Set <code>localStorage.TALARIA_BROWSER_API_KEY</code> or open with <code>?apiKey=tal_pk_…</code>. The Vite page reads <code>.env</code> instead.';
       }
     </script>
   </body>
