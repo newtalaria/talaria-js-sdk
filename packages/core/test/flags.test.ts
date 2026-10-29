@@ -263,7 +263,7 @@ describe('feature flags client', () => {
         userId: 'user_1',
         attributes: { plan: 'team' },
       });
-      assert.equal(url, 'http://localhost:8080/flags/evaluate');
+      assert.equal(url, 'http://localhost:8080/v1/flags');
       const input = body!.input as Record<string, unknown>;
       assert.equal(input.__className__, 'EvaluateFlagsInput');
       assert.equal(input.anonymousId, 'anon_1');
@@ -276,7 +276,7 @@ describe('feature flags client', () => {
 
   it('emits $feature_flag_called once per key per session', async () => {
     const restore = installFetch((url) => {
-      if (url.includes('/flags/evaluate')) {
+      if (url.includes('/v1/flags')) {
         return evaluateResponse({ key: 'demo', variationKey: 'on', value: true });
       }
       return {};
@@ -294,12 +294,12 @@ describe('feature flags client', () => {
       globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-        if (url.includes('/analytics/ingestBatch')) {
+        if (url.includes('/v1/analytics')) {
           const inputBody = body.input as Record<string, unknown>;
           const events = inputBody.events as Array<Record<string, unknown>>;
           for (const event of events) names.push(String(event.name));
         }
-        if (url.includes('/flags/evaluate')) {
+        if (url.includes('/v1/flags')) {
           return new Response(
             JSON.stringify({
               data: evaluateResponse({ key: 'demo', variationKey: 'on', value: true }),

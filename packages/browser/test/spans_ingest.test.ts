@@ -43,7 +43,7 @@ describe('spans/ingestBatch transport', () => {
         },
       ]);
 
-      assert.equal(url, 'http://localhost:8080/spans/ingestBatch');
+      assert.equal(url, 'http://localhost:8080/v1/spans');
       assert.equal(url.includes('/events/'), false);
       const input = body!.input as Record<string, unknown>;
       assert.equal(input.__className__, 'IngestSpanBatchInput');

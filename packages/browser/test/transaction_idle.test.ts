@@ -60,7 +60,7 @@ function installFetchCapture(): { calls: Array<{ url: string; body: Record<strin
 function initTracedClient(): TalariaClient {
   const client = new TalariaClient();
   client.init({
-    dsn: 'http://localhost:8080',
+    url: 'http://localhost:8080',
     apiKey: 'tal_live_test',
     remoteConfig: false,
     disableDefaultIntegrations: true,

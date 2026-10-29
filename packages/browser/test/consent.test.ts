@@ -40,7 +40,7 @@ function measurementPolicy() {
 function openClient(options?: { publicAnalytics?: boolean }): TalariaClient {
   const client = new TalariaClient();
   client.init({
-    dsn: 'http://localhost:8080',
+    url: 'http://localhost:8080',
     apiKey: 'tal_live_test',
     remoteConfig: false,
     disableDefaultIntegrations: true,
@@ -147,7 +147,7 @@ describe('banner consent', () => {
       await client.captureException(new Error('still captured'));
       await client.flush();
       assert.equal(
-        urls.some((url) => url.includes('/events/ingestBatch')),
+        urls.some((url) => url.includes('/v1/events')),
         true,
       );
     } finally {

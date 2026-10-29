@@ -343,10 +343,7 @@ function normalizeLoggerPresets(
 }
 
 function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
-  const baseUrl = (options.baseUrl ?? options.dsn ?? '').trim();
-  if (!baseUrl) {
-    throw new Error('@newtalaria/browser: init requires `dsn` or `baseUrl`');
-  }
+  const baseUrl = (options.url ?? 'https://ingest.newtalaria.com').trim();
   if (!options.apiKey?.trim()) {
     throw new Error('@newtalaria/browser: init requires `apiKey`');
   }

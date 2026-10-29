@@ -65,7 +65,7 @@ describe('initClient navigation listeners', () => {
     const env = installWindow('/learn/web-vitals');
     try {
       initClient({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
       });
 

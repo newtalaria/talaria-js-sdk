@@ -63,7 +63,7 @@ describe('browser tracing', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
@@ -95,7 +95,7 @@ describe('browser tracing', () => {
       try {
         const client = new TalariaClient();
         client.init({
-          dsn: 'http://localhost:8080',
+          url: 'http://localhost:8080',
           apiKey: 'tal_live_test',
           remoteConfig: false,
           disableDefaultIntegrations: true,
@@ -135,7 +135,7 @@ describe('browser tracing', () => {
         assert.ok(crumbs.some((c) => c.category === 'fetch' && c.type === 'http'));
         assert.equal(crumbs[0]!.__className__, 'BreadcrumbDto');
 
-        const spanCall = calls.find((c) => c.url.endsWith('/spans/ingestBatch'));
+        const spanCall = calls.find((c) => c.url.endsWith('/v1/spans'));
         assert.ok(spanCall);
         const spanInput = spanCall!.body.input as Record<string, unknown>;
         assert.equal(spanInput.__className__, 'IngestSpanBatchInput');

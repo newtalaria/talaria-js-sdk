@@ -7,7 +7,7 @@ import { ServerpodTransport, resolveReleaseIdentity } from '@newtalaria/core';
 const SEGMENT = /^[A-Za-z0-9._~+-]+$/;
 const SAFE_DEBUG_ID = /^[A-Za-z0-9._~+-]{1,80}$/;
 const DEBUG_COMMENT = /\/\/# debugId=([^\s]+)/;
-const LOCAL_URL = 'http://localhost:8080';
+const DEFAULT_URL = 'https://ingest.newtalaria.com';
 
 export interface UploadSourceMapsOptions {
   cwd: string;
@@ -42,7 +42,7 @@ export async function uploadSourceMaps(
     return 1;
   }
 
-  const url = parsed.url || options.env.TALARIA_BASE_URL || LOCAL_URL;
+  const url = parsed.url || options.env.TALARIA_URL || DEFAULT_URL;
   const release =
     resolveReleaseIdentity({
       release: parsed.release,
@@ -107,7 +107,7 @@ export async function uploadSourceMaps(
     };
     if (debugId) input.debugId = debugId;
     try {
-      const result = await transport.call('sourceMaps', 'upload', { input });
+      const result = await transport.call('v1', 'source-maps', { input });
       const id =
         result && typeof result === 'object' && 'id' in result
           ? String((result as { id: unknown }).id)

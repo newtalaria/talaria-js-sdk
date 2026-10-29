@@ -55,7 +55,7 @@ describe('analytics ingest serialization', () => {
         },
       ]);
 
-      assert.equal(url, 'http://localhost:8080/analytics/ingestBatch');
+      assert.equal(url, 'http://localhost:8080/v1/analytics');
       const input = body!.input as Record<string, unknown>;
       assert.equal(input.__className__, 'IngestAnalyticsEventBatchInput');
       const events = input.events as Array<Record<string, unknown>>;

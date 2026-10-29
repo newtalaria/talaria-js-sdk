@@ -21,7 +21,7 @@ describe('node scope context', () => {
     const client = new TalariaNodeClient();
     try {
       client.init({
-        dsn: 'http://127.0.0.1:9',
+        url: 'http://127.0.0.1:9',
         apiKey: 'tal_live_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,
@@ -73,7 +73,7 @@ describe('outgoing HTTP', () => {
         });
       }) as typeof fetch;
       client.init({
-        dsn: 'http://127.0.0.1:9',
+        url: 'http://127.0.0.1:9',
         apiKey: 'tal_live_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,

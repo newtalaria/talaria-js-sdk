@@ -75,7 +75,7 @@ function serializeEvent(params: IngestEventParams): Record<string, unknown> {
 /**
  * Batch-ingest events. The normal path — a single leftover item is still a batch of one.
  *
- * `POST {baseUrl}/events/ingestBatch` with `__className__: 'IngestEventBatchInput'`.
+ * `POST {baseUrl}/v1/events` with `__className__: 'IngestEventBatchInput'`.
  */
 export async function ingestEventBatch(
   transport: ServerpodTransport,
@@ -85,8 +85,8 @@ export async function ingestEventBatch(
   if (events.length === 0) return undefined;
   const keepalive = opts?.keepalive ?? events.some((event) => event.keepalive);
   return transport.call(
+    'v1',
     'events',
-    'ingestBatch',
     {
       input: {
         __className__: 'IngestEventBatchInput',

@@ -27,7 +27,7 @@ describe('TalariaNodeClient', () => {
     try {
       const client = new TalariaNodeClient();
       client.init({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         disableDefaultIntegrations: true,
       });
@@ -35,7 +35,7 @@ describe('TalariaNodeClient', () => {
       await client.captureException(new Error('node boom'));
       await client.close();
 
-      assert.match(url, /\/events\/ingestBatch$/);
+      assert.match(url, /\/v1\/events$/);
       const input = body!.input as Record<string, unknown>;
       const events = input.events as Array<Record<string, unknown>>;
       assert.equal(events[0]!.platform, 'node');

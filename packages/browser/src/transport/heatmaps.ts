@@ -183,7 +183,7 @@ export function parseHeatmapBatchResponse(raw: unknown): HeatmapBatchResult {
 }
 
 /**
- * `POST {baseUrl}/heatmaps/ingestBatch`. Parallel to analytics — uses the
+ * `POST {baseUrl}/v1/heatmaps`. Parallel to analytics — uses the
  * `analyticsWrite` key scope and follows analytics consent.
  */
 export async function ingestHeatmapBatch(
@@ -192,8 +192,8 @@ export async function ingestHeatmapBatch(
   opts?: { keepalive?: boolean },
 ): Promise<HeatmapBatchResult> {
   const raw = await transport.call(
+    'v1',
     'heatmaps',
-    'ingestBatch',
     {
       input: {
         __className__: 'IngestHeatmapBatchInput',
@@ -214,12 +214,12 @@ export interface HeatmapSnapshotParams {
   capturedAt: string;
 }
 
-export const HEATMAP_SNAPSHOTS_PATH = '/ingest/v1/heatmaps/snapshots';
+export const HEATMAP_SNAPSHOTS_PATH = '/v1/heatmaps/snapshots';
 
 /**
  * Upload a snapshot for a server-requested pageview: raw gzip to
- * `/ingest/v1/heatmaps/snapshots` when the server advertises
- * `binaryUploads`, else `POST {baseUrl}/heatmaps/uploadSnapshot` (base64).
+ * `/v1/heatmaps/snapshots` when the server advertises
+ * `binaryUploads`, else `POST {baseUrl}/v1/heatmaps/snapshots` (base64).
  */
 export async function uploadHeatmapSnapshot(
   transport: ServerpodTransport,
@@ -248,7 +248,7 @@ export async function uploadHeatmapSnapshot(
       transport.disableBinaryUploads();
     }
   }
-  return transport.call('heatmaps', 'uploadSnapshot', {
+  return transport.call('v1/heatmaps', 'snapshots', {
     input: {
       __className__: 'UploadHeatmapSnapshotInput',
       pageViewId: params.pageViewId,

@@ -25,8 +25,7 @@ let commitSha: string | undefined;
 let releaseRefKind: 'branch' | 'tag' | undefined;
 
 export function initEdge(options: CoreInitOptions): void {
-  const baseUrl = (options.dsn || options.baseUrl || '').replace(/\/+$/, '');
-  if (!baseUrl) throw new Error('@newtalaria/nextjs/edge: init requires dsn or baseUrl');
+  const baseUrl = (options.url || 'https://ingest.newtalaria.com').replace(/\/+$/, '');
   transport = new ServerpodTransport({ baseUrl, apiKey: options.apiKey });
   const identity = resolveReleaseIdentity({
     release: options.release,

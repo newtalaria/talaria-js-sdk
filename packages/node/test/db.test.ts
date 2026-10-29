@@ -19,7 +19,7 @@ const tracingOn: SdkConfigDocument = {
 function client(): TalariaNodeClient {
   const subject = new TalariaNodeClient();
   subject.init({
-    dsn: 'http://localhost:8080',
+    url: 'http://localhost:8080',
     apiKey: 'tal_live_test',
     disableDefaultIntegrations: true,
     remoteConfig: false,
@@ -40,7 +40,7 @@ async function collected(subject: TalariaNodeClient): Promise<{
     const url = String(input);
     const body = JSON.parse(String(init?.body ?? '{}')) as { input?: Record<string, unknown> };
     const inputBody = body.input ?? {};
-    if (url.includes('/spans/')) {
+    if (url.includes('/v1/spans')) {
       spans.push(...((inputBody.spans as Array<Record<string, unknown>>) ?? []));
     }
     if (url.includes('/events/')) {
@@ -232,7 +232,7 @@ async function flushOnly(subject: TalariaNodeClient): Promise<Array<Record<strin
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const body = JSON.parse(String(init?.body ?? '{}')) as { input?: Record<string, unknown> };
-    if (url.includes('/spans/')) {
+    if (url.includes('/v1/spans')) {
       spans.push(...(((body.input ?? {}).spans as Array<Record<string, unknown>>) ?? []));
     }
     return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });

@@ -45,7 +45,7 @@ describe('browser analytics + identity', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
@@ -61,7 +61,7 @@ describe('browser analytics + identity', () => {
 
       await client.captureException(new Error('boom'));
       await client.flush();
-      const eventPost = posts.find((p) => p.url.includes('/events/ingestBatch'));
+      const eventPost = posts.find((p) => p.url.includes('/v1/events'));
       assert.ok(eventPost);
       const input = eventPost.body.input as Record<string, unknown>;
       const events = input.events as Array<Record<string, unknown>>;
@@ -76,7 +76,7 @@ describe('browser analytics + identity', () => {
       });
       await client.analytics.flush();
       const analyticsPost = posts.find((p) =>
-        p.url.includes('/analytics/ingestBatch'),
+        p.url.includes('/v1/analytics'),
       );
       assert.ok(analyticsPost);
       const aInput = analyticsPost.body.input as Record<string, unknown>;
@@ -109,7 +109,7 @@ describe('browser analytics + identity', () => {
     try {
       const first = new TalariaClient();
       first.init({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
@@ -122,7 +122,7 @@ describe('browser analytics + identity', () => {
 
       const second = new TalariaClient();
       second.init({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
@@ -145,7 +145,7 @@ describe('browser analytics + identity', () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes('/analytics/ingestBatch')) {
+      if (url.includes('/v1/analytics')) {
         const body = JSON.parse(String(init?.body ?? '{}')) as {
           input?: { events?: Array<{ name?: string; kind?: string }> };
         };
@@ -162,7 +162,7 @@ describe('browser analytics + identity', () => {
     try {
       const client = new TalariaClient();
       client.init({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,

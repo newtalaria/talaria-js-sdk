@@ -66,16 +66,21 @@ export class TalariaNodeClient {
       console.warn('@newtalaria/node: already initialized');
       return;
     }
-    const baseUrl = (raw.dsn || raw.baseUrl || '').replace(/\/+$/, '');
-    if (!baseUrl) throw new Error('@newtalaria/node: init requires dsn or baseUrl');
+    const baseUrl = (raw.url || 'https://ingest.newtalaria.com').replace(/\/+$/, '');
     const identity = resolveReleaseIdentity({
       release: raw.release,
       commitSha: raw.commitSha,
       env: process.env,
     });
+    // N3: Read OTEL_* vars with precedence: code > TALARIA_* > OTEL_* > default
+    const serviceName = raw.serviceName ?? 
+      process.env.OTEL_SERVICE_NAME ?? 
+      'node';
+    
     this.options = {
       ...raw,
       baseUrl,
+      serviceName,
       release: identity.release,
       commitSha: identity.commitSha,
       releaseRefKind: identity.releaseRefKind,
@@ -139,14 +144,33 @@ export class TalariaNodeClient {
       : 0;
     this.enableFlags = Boolean(document.flags?.enabled);
     if (tracingOn && !this.tracer) {
+      // N3: Build resource with OTEL_RESOURCE_ATTRIBUTES support
+      const resource: Record<string, string> = {
+        'service.name': this.options.serviceName || 'node',
+        'telemetry.sdk.name': SDK_NAME,
+        'telemetry.sdk.version': SDK_VERSION,
+      };
+      
+      // Parse OTEL_RESOURCE_ATTRIBUTES (k1=v1,k2=v2 format)
+      const otelAttrs = process.env.OTEL_RESOURCE_ATTRIBUTES;
+      if (otelAttrs) {
+        const pairs = otelAttrs.split(',');
+        for (const pair of pairs) {
+          const eq = pair.indexOf('=');
+          if (eq > 0) {
+            const key = pair.slice(0, eq).trim();
+            const value = pair.slice(eq + 1).trim();
+            if (key && value && !resource[key]) {
+              resource[key] = value;
+            }
+          }
+        }
+      }
+      
       this.tracer = new NodeTracer({
         transport: this.transport,
         sampleRate: this.options.tracesSampleRate,
-        resource: {
-          'service.name': this.options.serviceName || 'node',
-          'telemetry.sdk.name': SDK_NAME,
-          'telemetry.sdk.version': SDK_VERSION,
-        },
+        resource,
         getResourceExtras: () => this.flagsClient?.stampTags() ?? {},
         release: this.options.release,
         getUserId: () => this.scope.getUserId(),

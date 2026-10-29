@@ -52,7 +52,7 @@ export async function startReplay(
   if (params.userAgent) input.userAgent = params.userAgent;
 
   return transport.call(
-    'replays',
+    'v1/replays',
     'start',
     { input },
     { keepalive: params.keepalive },
@@ -86,7 +86,7 @@ function ensureSegmentFits(compressed: Uint8Array, method: string): void {
   }
 }
 
-export const REPLAY_SEGMENTS_PATH = '/ingest/v1/replays/segments';
+export const REPLAY_SEGMENTS_PATH = '/v1/replays/segments';
 
 /**
  * Binary route statuses that mean "this server (or its proxy) doesn't have
@@ -141,8 +141,8 @@ export async function ingestReplaySegment(
   }
 
   return transport.call(
-    'replays',
-    'ingestSegment',
+    'v1/replays',
+    'segments',
     { input: serializeSegmentInput(params, compressed) },
     { keepalive: params.keepalive },
   );
@@ -217,8 +217,8 @@ export async function ingestReplaySegmentBatch(
   );
 
   const raw = await transport.call(
-    'replays',
-    'ingestSegmentBatch',
+    'v1/replays',
+    'segments',
     {
       input: {
         __className__: 'IngestReplaySegmentBatchInput',
@@ -281,7 +281,7 @@ export async function finishReplay(
   if (params.reason) input.reason = params.reason;
 
   return transport.call(
-    'replays',
+    'v1/replays',
     'finish',
     { input },
     { keepalive: params.keepalive },

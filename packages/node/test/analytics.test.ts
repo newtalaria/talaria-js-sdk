@@ -17,7 +17,7 @@ describe('TalariaNodeClient analytics', () => {
     try {
       const client = new TalariaNodeClient();
       client.init({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         disableDefaultIntegrations: true,
       });
@@ -28,7 +28,7 @@ describe('TalariaNodeClient analytics', () => {
       client.analytics.optIn();
       client.analytics.track('server_event', { ok: true }, { userId: 'u-1' });
       await client.analytics.flush();
-      assert.equal(urls.some((u) => u.includes('/analytics/ingestBatch')), true);
+      assert.equal(urls.some((u) => u.includes('/v1/analytics')), true);
       await client.close();
     } finally {
       globalThis.fetch = originalFetch;
@@ -42,8 +42,8 @@ describe('TalariaNodeClient analytics', () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-      if (url.includes('/analytics/')) analyticsBody = body;
-      if (url.includes('/events/')) eventBody = body;
+      if (url.includes('/v1/analytics')) analyticsBody = body;
+      if (url.includes('/v1/events')) eventBody = body;
       return new Response(JSON.stringify({}), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -53,7 +53,7 @@ describe('TalariaNodeClient analytics', () => {
     try {
       const client = new TalariaNodeClient();
       client.init({
-        dsn: 'http://localhost:8080',
+        url: 'http://localhost:8080',
         apiKey: 'tal_live_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,

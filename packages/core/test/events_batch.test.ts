@@ -27,7 +27,7 @@ describe('event batch ingest', () => {
         level: 'error',
         anonymousId: 'anon-evt',
       });
-      assert.match(url, /\/events\/ingestBatch$/);
+      assert.match(url, /\/v1\/events$/);
       const input = body!.input as Record<string, unknown>;
       assert.equal(input.__className__, 'IngestEventBatchInput');
       const events = input.events as Array<Record<string, unknown>>;

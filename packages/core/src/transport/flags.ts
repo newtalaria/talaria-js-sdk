@@ -21,7 +21,7 @@ function unwrapServerpodResult(raw: unknown): Record<string, unknown> {
 /**
  * Evaluate feature flags for the current visitor context.
  *
- * `POST {baseUrl}/flags/evaluate` with `__className__: 'EvaluateFlagsInput'`.
+ * `POST {baseUrl}/v1/flags` with `__className__: 'EvaluateFlagsInput'`.
  */
 export async function evaluateFlags(
   transport: ServerpodTransport,
@@ -38,6 +38,6 @@ export async function evaluateFlags(
   }
   if (input.keys && input.keys.length > 0) body.keys = input.keys;
 
-  const response = await transport.call('flags', 'evaluate', { input: body });
+  const response = await transport.call('v1', 'flags', { input: body });
   return unwrapServerpodResult(response);
 }

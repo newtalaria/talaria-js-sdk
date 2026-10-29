@@ -16,7 +16,7 @@ describe('edge capture', () => {
 
     try {
       initEdge({
-        dsn: 'http://127.0.0.1:9',
+        url: 'http://127.0.0.1:9',
         apiKey: 'tal_live_test',
         release: 'edge-1',
       });
