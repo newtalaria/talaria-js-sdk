@@ -31,7 +31,7 @@ export interface CallOptions {
   keepalive?: boolean;
   signal?: AbortSignal;
   /** HTTP method override (default: POST) */
-  method?: 'POST' | 'PUT';
+  method?: 'GET' | 'POST' | 'PUT';
 }
 
 /**
@@ -87,7 +87,39 @@ export class ServerpodTransport {
     body: Record<string, unknown>,
     opts?: CallOptions,
   ): Promise<unknown> {
-    const url = `${this.baseUrl}/${endpoint}/${method}`;
+    let url = `${this.baseUrl}/${endpoint}/${method}`;
+    
+    // GET requests: convert body to query params
+    if (opts?.method === 'GET') {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(body)) {
+        if (value !== undefined && value !== null) {
+          if (Array.isArray(value)) {
+            // Serialize arrays as comma-separated
+            params.set(key, value.join(','));
+          } else if (typeof value === 'object') {
+            // Serialize objects as JSON
+            params.set(key, JSON.stringify(value));
+          } else {
+            params.set(key, String(value));
+          }
+        }
+      }
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-API-Key': this.apiKey,
+        },
+        credentials: 'omit',
+        signal: opts.signal,
+      });
+      return this.read(response, `${endpoint}/${method}`);
+    }
+    
+    // POST/PUT requests: send JSON body
     const json = JSON.stringify(body);
     let gzipped = false;
     let payload: string | Uint8Array = json;

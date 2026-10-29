@@ -21,23 +21,21 @@ function unwrapServerpodResult(raw: unknown): Record<string, unknown> {
 /**
  * Evaluate feature flags for the current visitor context.
  *
- * `POST {baseUrl}/v1/flags` with `__className__: 'EvaluateFlagsInput'`.
+ * `GET {baseUrl}/v1/flags` with query parameters (API key auth, `flags:read` scope).
  */
 export async function evaluateFlags(
   transport: ServerpodTransport,
   input: EvaluateFlagsInput,
 ): Promise<Record<string, unknown>> {
-  const body: Record<string, unknown> = {
-    __className__: 'EvaluateFlagsInput',
-  };
-  if (input.anonymousId) body.anonymousId = input.anonymousId;
-  if (input.userId) body.userId = input.userId;
-  if (input.organizationId) body.organizationId = input.organizationId;
+  const params: Record<string, unknown> = {};
+  if (input.anonymousId) params.anonymousId = input.anonymousId;
+  if (input.userId) params.userId = input.userId;
+  if (input.organizationId) params.organizationId = input.organizationId;
   if (input.attributes && Object.keys(input.attributes).length > 0) {
-    body.attributes = input.attributes;
+    params.attributes = input.attributes;
   }
-  if (input.keys && input.keys.length > 0) body.keys = input.keys;
+  if (input.keys && input.keys.length > 0) params.keys = input.keys;
 
-  const response = await transport.call('v1', 'flags', { input: body });
+  const response = await transport.call('v1', 'flags', params, { method: 'GET' });
   return unwrapServerpodResult(response);
 }

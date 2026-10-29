@@ -10,7 +10,9 @@ cd talaria-js-sdk/examples/vanilla
 cp .env.example .env
 ```
 
-Put a project client key (`tal_prod_…`) in `.env` as `TALARIA_BROWSER_API_KEY`. Local server: `TALARIA_URL=http://127.0.0.1:8080`.
+Put a project client key (`tal_prod_…`) in `.env` as `VITE_TALARIA_BROWSER_API_KEY`. Local server: `VITE_TALARIA_URL=http://127.0.0.1:8080`.
+
+**SECURITY**: Never use `VITE_` prefix with `TALARIA_API_KEY` or `TALARIA_RELEASE_KEY` — these are server-only secrets.
 
 ```bash
 npm install

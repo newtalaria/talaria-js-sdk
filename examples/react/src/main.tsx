@@ -4,11 +4,11 @@ import { Talaria, reactErrorHandler } from '@newtalaria/react';
 import { App } from './App';
 import './style.css';
 
-const apiKey = import.meta.env.TALARIA_BROWSER_API_KEY || '';
+const apiKey = import.meta.env.VITE_TALARIA_BROWSER_API_KEY || '';
 
 if (apiKey) {
   Talaria.init({
-    url: import.meta.env.TALARIA_URL || 'https://ingest.newtalaria.com',
+    url: import.meta.env.VITE_TALARIA_URL || 'https://ingest.newtalaria.com',
     apiKey,
     remoteConfig: true,
   });

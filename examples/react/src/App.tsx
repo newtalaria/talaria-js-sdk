@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ErrorBoundary, Profiler, Talaria } from '@newtalaria/react';
 
-const url = import.meta.env.TALARIA_URL || 'https://ingest.newtalaria.com';
+const url = import.meta.env.VITE_TALARIA_URL || 'https://ingest.newtalaria.com';
 const apiKey = import.meta.env.VITE_TALARIA_API_KEY || '';
 
 export function App() {

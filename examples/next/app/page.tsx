@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import { boomAction } from './actions';
 
 const url =
-  process.env.TALARIA_URL ?? 'https://ingest.newtalaria.com';
+  process.env.NEXT_PUBLIC_TALARIA_URL ?? 'https://ingest.newtalaria.com';
 const apiKey = process.env.NEXT_PUBLIC_TALARIA_API_KEY ?? '';
 const ready = Boolean(apiKey);
 
