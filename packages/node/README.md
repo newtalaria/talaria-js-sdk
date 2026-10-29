@@ -13,7 +13,7 @@ import http from 'node:http';
 import { Talaria, handleHttpRequest } from '@newtalaria/node';
 
 Talaria.init({
-  dsn: 'https://ingest.newtalaria.com',
+  url: process.env.TALARIA_URL || 'https://ingest.newtalaria.com',
   apiKey: process.env.TALARIA_API_KEY!,
   remoteConfig: true,
 });
@@ -24,6 +24,6 @@ http.createServer((req, res) => {
 }).listen(3000);
 ```
 
-The API key decides the environment. Long-lived workers should call `Talaria.resetRequestState()` between jobs.
+The API key decides the environment. Default URL is `https://ingest.newtalaria.com`. Server SDKs also read `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`. Long-lived workers should call `Talaria.resetRequestState()` between jobs.
 
 Building Next.js? Install [`@newtalaria/nextjs`](https://www.npmjs.com/package/@newtalaria/nextjs) instead.

@@ -29,12 +29,10 @@ export type FailedRequestStatusCode = number | [number, number];
 export interface TalariaInitOptions {
   /**
    * Talaria API base URL, e.g. `https://ingest.newtalaria.com`.
-   * Alias of `baseUrl`.
+   * Default: `https://ingest.newtalaria.com`.
    */
-  dsn?: string;
-  /** Same as `dsn` — prefer one of the two. */
-  baseUrl?: string;
-  /** Project API key (`tal_live_…`). */
+  url?: string;
+  /** Project API key (`tal_prod_…`, `tal_stg_…`, `tal_test_…`, `tal_dev_…`). */
   apiKey: string;
   release?: string;
   /**

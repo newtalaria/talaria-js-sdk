@@ -131,8 +131,7 @@ export interface UserContext {
 }
 
 export interface CoreInitOptions {
-  dsn?: string;
-  baseUrl?: string;
+  url?: string;
   apiKey: string;
   release?: string;
   commitSha?: string;

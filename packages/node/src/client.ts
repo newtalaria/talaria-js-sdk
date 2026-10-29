@@ -66,13 +66,20 @@ export class TalariaNodeClient {
       console.warn('@newtalaria/node: already initialized');
       return;
     }
-    const baseUrl = (raw.dsn || raw.baseUrl || '').replace(/\/+$/, '');
-    if (!baseUrl) throw new Error('@newtalaria/node: init requires dsn or baseUrl');
+    // Precedence: code > TALARIA_URL > default
+    const url = raw.url || process.env.TALARIA_URL || 'https://ingest.newtalaria.com';
+    const baseUrl = url.replace(/\/+$/, '');
+    
     const identity = resolveReleaseIdentity({
       release: raw.release,
       commitSha: raw.commitSha,
       env: process.env,
     });
+    
+    // Read OTEL_* env vars (precedence: code > TALARIA_* > OTEL_*)
+    const serviceName = raw.serviceName || process.env.OTEL_SERVICE_NAME || 'node';
+    const resourceAttrs = parseResourceAttributes(process.env.OTEL_RESOURCE_ATTRIBUTES);
+    
     this.options = {
       ...raw,
       baseUrl,
@@ -85,7 +92,14 @@ export class TalariaNodeClient {
       sampleRate: 1,
       remoteConfig: raw.remoteConfig !== false,
       disableDefaultIntegrations: raw.disableDefaultIntegrations === true,
+      serviceName,
     };
+    
+    // Merge OTEL_RESOURCE_ATTRIBUTES with tags
+    if (resourceAttrs && Object.keys(resourceAttrs).length > 0) {
+      this.scope.setTags({ ...resourceAttrs, ...raw.tags });
+    }
+    
     this.transport = new ServerpodTransport({
       baseUrl,
       apiKey: raw.apiKey,
@@ -546,4 +560,22 @@ function nodePolicyStorage(): SdkPolicyStorage {
 
 function nodePolicyPath(key: string): string {
   return `${tmpdir()}/talaria/${key.replace(/[^\w.-]/g, '_')}.json`;
+}
+
+/**
+ * Parse OTEL_RESOURCE_ATTRIBUTES (comma-separated key=value pairs).
+ * Example: "service.name=my-service,deployment.environment.name=production"
+ */
+function parseResourceAttributes(raw: string | undefined): Record<string, string> | null {
+  if (!raw) return null;
+  const attrs: Record<string, string> = {};
+  for (const pair of raw.split(',')) {
+    const eq = pair.indexOf('=');
+    if (eq > 0) {
+      const key = pair.slice(0, eq).trim();
+      const value = pair.slice(eq + 1).trim();
+      if (key && value) attrs[key] = value;
+    }
+  }
+  return Object.keys(attrs).length > 0 ? attrs : null;
 }
