@@ -227,7 +227,7 @@ export async function uploadHeatmapSnapshot(
 ): Promise<unknown> {
   if (params.gzip.length > MAX_HEATMAP_SNAPSHOT_BYTES) {
     throw new Error(
-      `Talaria heatmaps/uploadSnapshot skipped: snapshot exceeds ${MAX_HEATMAP_SNAPSHOT_BYTES} bytes`,
+      `Talaria v1/heatmaps/snapshots skipped: snapshot exceeds ${MAX_HEATMAP_SNAPSHOT_BYTES} bytes`,
     );
   }
   if (transport.capabilities.binaryUploads) {

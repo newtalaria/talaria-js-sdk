@@ -26,7 +26,7 @@ describe('analytics ingest serialization', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       await ingestAnalyticsEventBatch(transport, [
         {
@@ -92,7 +92,7 @@ describe('analytics ingest serialization', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       await ingestAnalyticsEventBatch(transport, []);
       assert.equal(called, false);
@@ -132,7 +132,7 @@ describe('AnalyticsFacade consent', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const identity = new IdentityStore(createMemoryStorage(), {
         createId: () => 'id-1',

@@ -10,7 +10,7 @@ cd talaria-js-sdk/examples/next
 cp .env.example .env.local
 ```
 
-Put a project client key (`tal_live_…`) in `.env.local` as both `NEXT_PUBLIC_TALARIA_API_KEY` and `TALARIA_API_KEY`. Local server: set both DSN values to `http://127.0.0.1:8080`.
+Put a project client key (`tal_prod_…`) in `.env.local` as `TALARIA_BROWSER_API_KEY` (browser) and `TALARIA_API_KEY` (server). Local server: set `TALARIA_URL=http://127.0.0.1:8080`.
 
 ```bash
 npm install

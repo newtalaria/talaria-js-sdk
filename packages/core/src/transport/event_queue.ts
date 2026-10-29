@@ -9,7 +9,7 @@ export const MAX_EVENT_BATCH = 50;
 export const EVENT_FLUSH_INTERVAL_MS = 2000;
 
 /**
- * Buffers error/log events and posts them as one `events/ingestBatch`.
+ * Buffers error/log events and posts them as one `v1/events` batch.
  * A `keepalive` event (page hide) flushes immediately.
  */
 export class EventIngestQueue {

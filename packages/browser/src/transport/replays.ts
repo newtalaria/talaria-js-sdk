@@ -53,7 +53,7 @@ export async function startReplay(
 
   return transport.call(
     'v1/replays',
-    'start',
+    '',
     { input },
     { keepalive: params.keepalive },
   );
@@ -81,7 +81,7 @@ function serializeSegmentInput(params: IngestSegmentParams, gzip: Uint8Array) {
 function ensureSegmentFits(compressed: Uint8Array, method: string): void {
   if (compressed.length > MAX_COMPRESSED_SEGMENT_BYTES) {
     throw new Error(
-      `Talaria replays/${method} failed: HTTP 400 — segment exceeds max compressed size (${compressed.length} > ${MAX_COMPRESSED_SEGMENT_BYTES})`,
+      `Talaria v1/replays/${method} failed: HTTP 400 — segment exceeds max compressed size (${compressed.length} > ${MAX_COMPRESSED_SEGMENT_BYTES})`,
     );
   }
 }
@@ -158,7 +158,7 @@ export async function ingestReplaySegmentBatch(
   opts?: { keepalive?: boolean },
 ): Promise<IngestSegmentBatchResult> {
   if (segments.length === 0) {
-    throw new Error('Talaria replays/ingestSegmentBatch requires segments');
+    throw new Error('Talaria v1/replays/segments requires segments');
   }
 
   const compressedAll: Uint8Array[] = [];
@@ -281,9 +281,9 @@ export async function finishReplay(
   if (params.reason) input.reason = params.reason;
 
   return transport.call(
-    'v1/replays',
-    'finish',
+    `v1/replays/${params.replayId}`,
+    '',
     { input },
-    { keepalive: params.keepalive },
+    { keepalive: params.keepalive, method: 'PUT' },
   );
 }

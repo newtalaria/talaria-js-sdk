@@ -7,7 +7,7 @@ function tracer(): NodeTracer {
   return new NodeTracer({
     transport: new ServerpodTransport({
       baseUrl: 'http://localhost:8080',
-      apiKey: 'tal_live_test',
+      apiKey: 'tal_test_test',
     }),
     sampleRate: 1,
     resource: { 'service.name': 'test' },

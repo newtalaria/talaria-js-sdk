@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { ServerpodTransport } from '../src/transport/serverpod.ts';
 import { ingestSpanBatch } from '../src/transport/spans.ts';
 
-describe('spans/ingestBatch transport', () => {
+describe('v1/spans transport', () => {
   it('POSTs IngestSpanBatchInput and does not use events/ingest', async () => {
     let url = '';
     let body: Record<string, unknown> | null = null;
@@ -20,7 +20,7 @@ describe('spans/ingestBatch transport', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       await ingestSpanBatch(transport, [
         {
@@ -72,7 +72,7 @@ describe('spans/ingestBatch transport', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       await ingestSpanBatch(transport, []);
       assert.equal(called, false);

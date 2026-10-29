@@ -76,7 +76,7 @@ describe('model HTTP spans', () => {
     try {
       client.init({
         url: DSN,
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });

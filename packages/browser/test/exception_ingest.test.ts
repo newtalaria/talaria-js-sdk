@@ -26,7 +26,7 @@ describe('captureException exception payload', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -98,7 +98,7 @@ describe('captureException exception payload', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -146,7 +146,7 @@ describe('captureException exception payload', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -186,7 +186,7 @@ describe('captureException exception payload', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,

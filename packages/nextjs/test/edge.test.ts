@@ -17,7 +17,7 @@ describe('edge capture', () => {
     try {
       initEdge({
         url: 'http://127.0.0.1:9',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         release: 'edge-1',
       });
       setUser({ id: 'user-9' });

@@ -468,8 +468,8 @@ function isTerminalReplayLimitError(error: unknown): boolean {
 function errorFromBatchFailure(message: string): Error {
   return new Error(
     message
-      ? `Talaria replays/ingestSegmentBatch failed: HTTP 400 — ${message}`
-      : 'Talaria replays/ingestSegmentBatch failed: HTTP 400',
+      ? `Talaria v1/replays/segments failed: HTTP 400 — ${message}`
+      : 'Talaria v1/replays/segments failed: HTTP 400',
   );
 }
 
@@ -2876,7 +2876,7 @@ export class TalariaClient {
     }
 
     this.buffer.prepend(events);
-        console.warn('@newtalaria/browser: replays/ingestSegmentBatch failed', error);
+        console.warn('@newtalaria/browser: v1/replays/segments failed', error);
     if (isPermanentIngestError(error)) {
       this.disableIngestAfterPermanentError(error, 'replay');
       return 'stop';

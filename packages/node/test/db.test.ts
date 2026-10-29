@@ -20,7 +20,7 @@ function client(): TalariaNodeClient {
   const subject = new TalariaNodeClient();
   subject.init({
     url: 'http://localhost:8080',
-    apiKey: 'tal_live_test',
+    apiKey: 'tal_test_test',
     disableDefaultIntegrations: true,
     remoteConfig: false,
   });

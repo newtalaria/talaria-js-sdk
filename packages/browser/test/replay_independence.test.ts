@@ -20,7 +20,7 @@ describe('replay independence', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });

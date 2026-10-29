@@ -3,8 +3,8 @@
 import type { CSSProperties } from 'react';
 import { boomAction } from './actions';
 
-const dsn =
-  process.env.NEXT_PUBLIC_TALARIA_DSN ?? 'https://ingest.newtalaria.com';
+const url =
+  process.env.TALARIA_URL ?? 'https://ingest.newtalaria.com';
 const apiKey = process.env.NEXT_PUBLIC_TALARIA_API_KEY ?? '';
 const ready = Boolean(apiKey);
 
@@ -27,7 +27,7 @@ export default function Page() {
       >
         {ready ? (
           <>
-            Sending to <code>{dsn}</code>.
+            Sending to <code>{url}</code>.
           </>
         ) : (
           <>

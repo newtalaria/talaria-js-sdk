@@ -30,7 +30,7 @@ describe('replays/start failure', () => {
     process.on('unhandledRejection', onUnhandled);
     try {
       const client = new TalariaClient();
-      client.init({ url: 'http://localhost:8080', apiKey: 'tal_live_test', replaysSessionSampleRate: 0, replaysOnErrorSampleRate: 0, disableDefaultIntegrations: true });
+      client.init({ url: 'http://localhost:8080', apiKey: 'tal_test_test', replaysSessionSampleRate: 0, replaysOnErrorSampleRate: 0, disableDefaultIntegrations: true });
       const any = client as unknown as {
         transport: { call: (...a: unknown[]) => Promise<unknown> };
         replayId: string | null; sessionId: string | null; startedOnServer: boolean; replayDisabled: boolean;

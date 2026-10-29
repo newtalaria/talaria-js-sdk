@@ -6,6 +6,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   server: { port: 5177 },
+  envPrefix: ['VITE_', 'TALARIA_'],
   build: {
     rollupOptions: {
       input: {

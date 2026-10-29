@@ -120,7 +120,7 @@ describe('heatmap recorder', () => {
       });
     }) as typeof fetch;
     let now = 1_000;
-    const transport = new ServerpodTransport({ baseUrl: 'http://localhost:8080', apiKey: 'tal_live_x' });
+    const transport = new ServerpodTransport({ baseUrl: 'http://localhost:8080', apiKey: 'tal_test_x' });
     let snapshots = 0;
     const recorder = new HeatmapRecorder({
       headless: true,
@@ -189,7 +189,7 @@ describe('heatmap recorder', () => {
       await t.recorder.flush();
       await new Promise((r) => setTimeout(r, 0));
 
-      const ingest = t.calls.find((c) => c.url.endsWith('/heatmaps/ingestBatch'));
+      const ingest = t.calls.find((c) => c.url.endsWith('/v1/heatmaps'));
       assert.ok(ingest);
       const input = ingest.body.input as Record<string, unknown>;
       const pv = (input.pageViews as Array<Record<string, unknown>>)[0]!;
@@ -201,7 +201,7 @@ describe('heatmap recorder', () => {
       assert.equal(clicks[0]!.dead, true);
 
       assert.equal(t.snapshots(), 1);
-      const upload = t.calls.find((c) => c.url.endsWith('/heatmaps/uploadSnapshot'));
+      const upload = t.calls.find((c) => c.url.endsWith('/v1/heatmaps/snapshots'));
       assert.ok(upload);
       assert.equal((upload.body.input as Record<string, unknown>).pageViewId, 'pv1');
     } finally {

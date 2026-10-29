@@ -20,7 +20,7 @@ describe('event batch ingest', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       await ingestEvent(transport, {
         message: 'hello',
@@ -55,7 +55,7 @@ describe('event batch ingest', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       await ingestEventBatch(transport, [
         { message: 'a' },

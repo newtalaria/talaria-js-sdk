@@ -1,8 +1,8 @@
 import { Talaria } from '@newtalaria/browser';
 import './style.css';
 
-const url = import.meta.env.VITE_TALARIA_URL || 'https://ingest.newtalaria.com';
-const apiKey = import.meta.env.VITE_TALARIA_API_KEY || '';
+const url = import.meta.env.TALARIA_URL || 'https://ingest.newtalaria.com';
+const apiKey = import.meta.env.TALARIA_BROWSER_API_KEY || '';
 const ready = Boolean(apiKey);
 
 if (ready) {
@@ -26,7 +26,7 @@ app.innerHTML = `
       ${
         ready
           ? `Sending to <code>${url}</code>.`
-          : 'Copy <code>.env.example</code> to <code>.env</code> and set <code>VITE_TALARIA_API_KEY</code>.'
+          : 'Copy <code>.env.example</code> to <code>.env</code> and set <code>TALARIA_BROWSER_API_KEY</code>.'
       }
     </p>
     <div class="actions">

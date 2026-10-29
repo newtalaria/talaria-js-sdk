@@ -296,7 +296,7 @@ describe('lifecycle', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -304,7 +304,7 @@ describe('lifecycle', () => {
       await client.close();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -333,7 +333,7 @@ describe('event ↔ replay link after finish', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 1,
         replaysErrorAfterMs: 15_000,
@@ -407,7 +407,7 @@ describe('permanent ingest circuit breaker', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -460,7 +460,7 @@ describe('permanent ingest circuit breaker', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -497,7 +497,7 @@ describe('permanent ingest circuit breaker', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 0,
         disableDefaultIntegrations: true,
@@ -604,13 +604,13 @@ describe('replay segment batch + breadcrumbs', () => {
     };
   }
 
-  it('uploads an error clip as one ingestSegmentBatch POST', async () => {
+  it('uploads an error clip as one v1/replays/segments POST', async () => {
     const { urls, restore } = collectCalls();
     try {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });
@@ -650,7 +650,7 @@ describe('replay segment batch + breadcrumbs', () => {
       const client = new TalariaClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         replaysSessionSampleRate: 0,
         replaysOnErrorSampleRate: 1,
         disableDefaultIntegrations: true,

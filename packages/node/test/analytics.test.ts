@@ -18,7 +18,7 @@ describe('TalariaNodeClient analytics', () => {
       const client = new TalariaNodeClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         disableDefaultIntegrations: true,
       });
       client.analytics.track('server_event');
@@ -54,7 +54,7 @@ describe('TalariaNodeClient analytics', () => {
       const client = new TalariaNodeClient();
       client.init({
         url: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,
         anonymousId: 'node-anon',

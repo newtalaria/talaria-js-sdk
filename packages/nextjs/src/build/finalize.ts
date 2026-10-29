@@ -17,7 +17,7 @@ export interface FinalizeOptions {
   distDir?: string;
   release?: string;
   commitSha?: string;
-  /** Talaria API URL. Default TALARIA_BASE_URL, then NEXT_PUBLIC_TALARIA_DSN, then http://localhost:8080. */
+  /** Talaria API URL. Default TALARIA_URL or http://localhost:8080. */
   url?: string;
   /** `releases:write` key. Default TALARIA_RELEASE_KEY. The browser ingest key is never used. */
   apiKey?: string;
@@ -86,7 +86,7 @@ export async function finalizeTalariaRelease(options: FinalizeOptions): Promise<
     return result;
   }
   const release = identity.release!;
-  const url = options.url ?? env.TALARIA_BASE_URL ?? env.NEXT_PUBLIC_TALARIA_DSN ?? 'http://localhost:8080';
+  const url = options.url ?? env.TALARIA_URL ?? 'http://localhost:8080';
   const transport = options.transport ?? new ServerpodTransport({ baseUrl: url, apiKey: apiKey! });
   const projectId = options.projectId ?? env.TALARIA_PROJECT_ID; // optional: the key names the project
   log(`release ${release}${identity.commitSha ? ` (${identity.commitSha.slice(0, 12)}, from ${identity.source})` : ''} -> ${url}`);

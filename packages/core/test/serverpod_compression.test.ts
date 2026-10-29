@@ -61,7 +61,7 @@ const big = {
 function transport() {
   return new ServerpodTransport({
     baseUrl: 'https://ingest.example.com/',
-    apiKey: 'tal_live_test',
+    apiKey: 'tal_test_test',
   });
 }
 
@@ -164,7 +164,7 @@ describe('ServerpodTransport gzip', () => {
     assert.equal(url.pathname, '/ingest/v1/replays/segments');
     assert.equal(url.searchParams.get('segmentIndex'), '2');
     assert.equal(row.headers['Content-Type'], 'application/octet-stream');
-    assert.equal(row.headers['X-API-Key'], 'tal_live_test');
+    assert.equal(row.headers['X-API-Key'], 'tal_test_test');
     assert.equal(row.headers['Content-Encoding'], undefined);
     assert.deepEqual([...row.body], [...bytes]);
   });

@@ -60,7 +60,7 @@ function segment(i: number) {
 function transport(caps?: Record<string, boolean>) {
   const t = new ServerpodTransport({
     baseUrl: 'https://ingest.example.com',
-    apiKey: 'tal_live_test',
+    apiKey: 'tal_test_test',
   });
   if (caps) t.setCapabilities(caps);
   return t;
@@ -174,7 +174,7 @@ describe('heatmap snapshot', () => {
     assert.deepEqual([...seen[0]!.body], [...gz]);
   });
 
-  it('without the capability it uses heatmaps/uploadSnapshot', async () => {
+  it('without the capability it uses v1/heatmaps/snapshots RPC', async () => {
     const seen = mockFetch();
     await uploadHeatmapSnapshot(transport(), params);
     assert.equal(seen[0]!.url.pathname, '/v1/heatmaps/snapshots');

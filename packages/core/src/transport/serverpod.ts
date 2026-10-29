@@ -30,6 +30,8 @@ export interface CallOptions {
    */
   keepalive?: boolean;
   signal?: AbortSignal;
+  /** HTTP method override (default: POST) */
+  method?: 'POST' | 'PUT';
 }
 
 /**
@@ -149,7 +151,7 @@ export class ServerpodTransport {
     };
     if (gzipped) headers['Content-Encoding'] = 'gzip';
     const init: RequestInit = {
-      method: 'POST',
+      method: opts?.method || 'POST',
       headers,
       body,
       credentials: 'omit',

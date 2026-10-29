@@ -61,10 +61,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -96,10 +96,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -139,10 +139,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -172,10 +172,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags1 = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -194,7 +194,7 @@ describe('feature flags client', () => {
         })) as typeof fetch;
 
       const flags2 = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity: new IdentityStore(storage, { initialAnonymousId: 'anon-1' }),
         storage,
         getTransport: () => transport,
@@ -226,10 +226,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -256,7 +256,7 @@ describe('feature flags client', () => {
     try {
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const result = await evaluateFlags(transport, {
         anonymousId: 'anon_1',
@@ -287,7 +287,7 @@ describe('feature flags client', () => {
       identity.touchSession();
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const names: string[] = [];
       const originalFetch = globalThis.fetch;
@@ -331,7 +331,7 @@ describe('feature flags client', () => {
       analytics.optIn();
 
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,
@@ -378,10 +378,10 @@ describe('feature flags client', () => {
       const identity = new IdentityStore(storage, { initialAnonymousId: 'anon-1' });
       const transport = new ServerpodTransport({
         baseUrl: 'http://localhost:8080',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
       });
       const flags = new TalariaFlags({
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         identity,
         storage,
         getTransport: () => transport,

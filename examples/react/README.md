@@ -10,7 +10,7 @@ cd talaria-js-sdk/examples/react
 cp .env.example .env
 ```
 
-Put a project client key (`tal_live_…`) in `.env` as `VITE_TALARIA_API_KEY`. Local server: `VITE_TALARIA_DSN=http://127.0.0.1:8080`.
+Put a project client key (`tal_prod_…`) in `.env` as `TALARIA_BROWSER_API_KEY`. Local server: `TALARIA_URL=http://127.0.0.1:8080`.
 
 ```bash
 npm install

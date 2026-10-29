@@ -22,7 +22,7 @@ describe('node scope context', () => {
     try {
       client.init({
         url: 'http://127.0.0.1:9',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });
@@ -74,7 +74,7 @@ describe('outgoing HTTP', () => {
       }) as typeof fetch;
       client.init({
         url: 'http://127.0.0.1:9',
-        apiKey: 'tal_live_test',
+        apiKey: 'tal_test_test',
         remoteConfig: false,
         disableDefaultIntegrations: true,
       });

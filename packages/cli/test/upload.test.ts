@@ -43,7 +43,7 @@ describe('sourcemaps upload', () => {
       const code = await uploadSourceMaps({
         cwd: root,
         argv: ['sourcemaps', 'upload', 'dist'],
-        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
         log: (line) => logs.push(line),
         error: (line) => logs.push(`ERR ${line}`),
       });
@@ -55,7 +55,7 @@ describe('sourcemaps upload', () => {
     assert.equal(requests.length, 1);
     assert.equal(requests[0]!.url, 'http://localhost:8080/sourceMaps/upload');
     const headers = requests[0]!.init.headers as Record<string, string>;
-    assert.equal(headers['X-API-Key'], 'tal_live_release');
+    assert.equal(headers['X-API-Key'], 'tal_test_release');
     const body = JSON.parse(String(requests[0]!.init.body)) as {
       input: {
         __className__: string;
@@ -93,7 +93,7 @@ describe('sourcemaps upload', () => {
       const code = await uploadSourceMaps({
         cwd: root,
         argv: ['sourcemaps', 'upload', 'dist'],
-        env: { TALARIA_API_KEY: 'tal_live_release' },
+        env: { TALARIA_API_KEY: 'tal_test_release' },
         log: () => {},
         error: () => {},
       });
@@ -141,14 +141,14 @@ describe('sourcemaps upload', () => {
       const first = await uploadSourceMaps({
         cwd: root,
         argv: ['sourcemaps', 'upload', 'dist'],
-        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
         log: () => {},
         error: () => {},
       });
       const second = await uploadSourceMaps({
         cwd: root,
         argv: ['sourcemaps', 'upload', 'dist'],
-        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
         log: () => {},
         error: () => {},
       });
@@ -207,14 +207,14 @@ describe('sourcemaps upload', () => {
       const first = await uploadSourceMaps({
         cwd: root,
         argv: ['sourcemaps', 'upload', 'source-maps', '--silverstripe-combine-files'],
-        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
         log: (line) => logs.push(line),
         error: () => {},
       });
       const second = await uploadSourceMaps({
         cwd: root,
         argv: ['sourcemaps', 'upload', 'source-maps', '--silverstripe-combine-files'],
-        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
         log: () => {},
         error: () => {},
       });
@@ -256,7 +256,7 @@ describe('sourcemaps upload', () => {
       const code = await uploadSourceMaps({
         cwd: root,
         argv: ['sourcemaps', 'upload', '.next/static', '--url-prefix', '~/_next/static/', '--delete-after-upload'],
-        env: { TALARIA_RELEASE_KEY: 'tal_live_release' },
+        env: { TALARIA_RELEASE_KEY: 'tal_test_release' },
         log: () => {},
         error: () => {},
       });

@@ -78,7 +78,7 @@ describe('finalizeTalariaRelease', () => {
     }) as typeof fetch;
     let r;
     try {
-      r = await finalizeTalariaRelease({ projectDir: dir, release: 'main@aaaaaaa', commitSha: SHA, url: 'http://localhost:8180', apiKey: 'tal_live_rw', env: {}, transport, commits, log: () => {}, error: () => {} });
+      r = await finalizeTalariaRelease({ projectDir: dir, release: 'main@aaaaaaa', commitSha: SHA, url: 'http://localhost:8180', apiKey: 'tal_test_rw', env: {}, transport, commits, log: () => {}, error: () => {} });
     } finally {
       globalThis.fetch = prev;
     }
