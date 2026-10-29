@@ -14,14 +14,14 @@ npm install @newtalaria/browser
 import { Talaria } from '@newtalaria/browser';
 
 Talaria.init({
-  dsn: 'https://ingest.newtalaria.com',
-  apiKey: 'tal_live_…',
+  url: 'https://ingest.newtalaria.com',
+  apiKey: 'tal_prod_…',
   release: '1.4.2',
   minLevel: 'warning',
 });
 ```
 
-The API key decides the environment. Tracing, analytics, heatmaps, and session replay follow Project settings.
+The API key decides the environment. Default URL is `https://ingest.newtalaria.com`. Tracing, analytics, heatmaps, and session replay follow Project settings.
 
 ## License
 

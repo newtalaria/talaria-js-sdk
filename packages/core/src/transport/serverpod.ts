@@ -108,6 +108,35 @@ export class ServerpodTransport {
   }
 
   /**
+   * POST to a v1 REST-style endpoint with JSON body.
+   * Used for `/v1/events`, `/v1/spans`, `/v1/analytics`, etc.
+   */
+  async postV1(
+    path: string,
+    body: Record<string, unknown>,
+    opts?: CallOptions,
+  ): Promise<unknown> {
+    const url = `${this.baseUrl}${path}`;
+    const json = JSON.stringify(body);
+    let gzipped = false;
+    let payload: string | Uint8Array = json;
+    if (this.caps.gzipRequests && !opts?.keepalive) {
+      const compressed = await gzipJson(json);
+      if (compressed) {
+        payload = compressed;
+        gzipped = true;
+      }
+    }
+
+    let response = await fetch(url, this.init(payload, gzipped, opts));
+    if (gzipped && response.status === 415) {
+      this.caps = { ...this.caps, gzipRequests: false };
+      response = await fetch(url, this.init(json, false, opts));
+    }
+    return this.read(response, path.replace(/^\//, ''));
+  }
+
+  /**
    * POST raw bytes to a binary upload route (`path` like
    * `/ingest/v1/replays/segments`) with the small fields as query
    * parameters. Callers check `capabilities.binaryUploads` first.

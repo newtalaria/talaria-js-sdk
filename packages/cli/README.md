@@ -13,13 +13,13 @@ npx talaria sourcemaps upload ./dist
 With the Talaria API on port 8080:
 
 ```sh
-export TALARIA_RELEASE_KEY=tal_live_…   # releases:write only
+export TALARIA_RELEASE_KEY=tal_prod_…   # releases:write only
 export TALARIA_RELEASE=local            # same string as Talaria.init
 
 talaria sourcemaps upload ./dist
 ```
 
-Defaults are `http://localhost:8080` and release `local`. The command prints that URL, the release, and each artifact path. When a `.js` file sits beside a `.js.map`, the command writes one debug id into both and uploads the JavaScript path relative to the directory you passed (`dist/assets/app.js.map` is `assets/app.js`). Deploy those rewritten `.js` files. A map with no sibling keeps its basename.
+Defaults are `https://ingest.newtalaria.com` and release `local`. The command prints that URL, the release, and each artifact path. When a `.js` file sits beside a `.js.map`, the command writes one debug id into both and uploads the JavaScript path relative to the directory you passed (`dist/assets/app.js.map` is `assets/app.js`). Deploy those rewritten `.js` files. A map with no sibling keeps its basename.
 
 ## CI
 
@@ -30,7 +30,7 @@ The CLI command is the same upload:
 ```sh
 export TALARIA_RELEASE="${GITHUB_REF_NAME}@${GITHUB_SHA::7}"
 npx talaria sourcemaps upload \
-  --url "$TALARIA_BASE_URL" \
+  --url "$TALARIA_URL" \
   --api-key "$TALARIA_RELEASE_KEY" \
   --release "$TALARIA_RELEASE" \
   ./dist
@@ -40,7 +40,7 @@ The app keeps its ingest key:
 
 ```js
 Talaria.init({
-  dsn: process.env.NEXT_PUBLIC_TALARIA_DSN,
+  url: process.env.NEXT_PUBLIC_TALARIA_URL,
   apiKey: process.env.NEXT_PUBLIC_TALARIA_API_KEY,
   release: process.env.NEXT_PUBLIC_TALARIA_RELEASE,
 })
@@ -53,7 +53,7 @@ Hidden source maps work. Talaria reads the uploaded file when the event is opene
 | Setting | Flag | Environment | Default |
 | ------- | ---- | ----------- | ------- |
 | Directory | positional | | `.` |
-| API URL | `--url` | `TALARIA_BASE_URL` | `http://localhost:8080` |
+| API URL | `--url` | `TALARIA_URL` | `https://ingest.newtalaria.com` |
 | Release | `--release` | `TALARIA_RELEASE` | `local` |
 | Key | `--api-key` | `TALARIA_RELEASE_KEY`, then `TALARIA_API_KEY` | required |
 | Silverstripe combine | `--silverstripe-combine-files` | | off |

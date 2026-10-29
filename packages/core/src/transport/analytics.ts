@@ -103,7 +103,7 @@ export function serializeAnalyticsEvent(
 /**
  * Batch-ingest product analytics. Parallel path — never mix with events/spans.
  *
- * `POST {baseUrl}/analytics/ingestBatch` with
+ * `POST {baseUrl}/v1/analytics` with
  * `__className__: 'IngestAnalyticsEventBatchInput'`.
  */
 export async function ingestAnalyticsEventBatch(
@@ -112,9 +112,8 @@ export async function ingestAnalyticsEventBatch(
   opts?: { keepalive?: boolean },
 ): Promise<unknown> {
   if (events.length === 0) return undefined;
-  return transport.call(
-    'analytics',
-    'ingestBatch',
+  return transport.postV1(
+    '/v1/analytics',
     {
       input: {
         __className__: 'IngestAnalyticsEventBatchInput',

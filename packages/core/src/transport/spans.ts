@@ -39,7 +39,7 @@ export interface IngestSpanParams {
 /**
  * Batch-ingest spans. Never mix with events — spans are a parallel path.
  *
- * `POST {baseUrl}/spans/ingestBatch` with `__className__: 'IngestSpanBatchInput'`.
+ * `POST {baseUrl}/v1/spans` with `__className__: 'IngestSpanBatchInput'`.
  */
 export async function ingestSpanBatch(
   transport: ServerpodTransport,
@@ -53,7 +53,7 @@ export async function ingestSpanBatch(
     spans: spans.map(serializeSpan),
   };
 
-  return transport.call('spans', 'ingestBatch', { input }, {
+  return transport.postV1('/v1/spans', { input }, {
     keepalive: opts?.keepalive,
   });
 }

@@ -7,10 +7,15 @@ export interface ReleaseIdentity {
 }
 
 export interface ReleaseEnv {
+  TALARIA_URL?: string;
   TALARIA_RELEASE?: string;
   TALARIA_COMMIT_SHA?: string;
+  NEXT_PUBLIC_TALARIA_URL?: string;
   NEXT_PUBLIC_TALARIA_RELEASE?: string;
   NEXT_PUBLIC_TALARIA_COMMIT_SHA?: string;
+  VITE_TALARIA_URL?: string;
+  VITE_TALARIA_RELEASE?: string;
+  VITE_TALARIA_COMMIT_SHA?: string;
   GITHUB_REF_NAME?: string;
   GITHUB_SHA?: string;
   GITHUB_REF_TYPE?: string;
