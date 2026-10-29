@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0
+
+- **Breaking:** `dsn` is removed. `Talaria.init` takes `url` and a `tal_pk_<env>_<cell>_<43><6>` key (CRC32 base62 checksum). `tal_sk_` and `tal_mon_` are refused. When `url` is omitted, the host is `https://ingest-<cell>.newtalaria.com` from the key cell. `url` (from `TALARIA_URL` / `NEXT_PUBLIC_TALARIA_URL` / `VITE_TALARIA_URL`) overrides that host.
+- **Breaking:** Ingest is v1 REST with `Authorization: Bearer` and plain JSON batches. Errors are `application/problem+json`.
+- Depends on `@newtalaria/browser` ^0.6.0.
+
 ## 0.5.4
 
 - Depends on `@newtalaria/browser` ^0.5.4. No API changes.

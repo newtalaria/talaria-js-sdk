@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- **Breaking:** `dsn` is removed. Init takes `url` or `TALARIA_URL`. When both are unset, the host is `https://ingest-<cell>.newtalaria.com` from the key cell. A `self` cell requires `url` or `TALARIA_URL`.
+- **Breaking:** `apiKey` / `TALARIA_API_KEY` must be `tal_sk_<env>_<cell>_<43><6>` (CRC32 base62 checksum). A `tal_pk_` key warns once. `tal_mon_` is refused. Auth is `Authorization: Bearer`. Errors are `application/problem+json`.
+- **Breaking:** Ingest is v1 REST: `POST /v1/events`, `/v1/spans`, `/v1/analytics`, `/v1/flags/evaluate`; `GET /v1/flags` (definitions); `GET /v1/sdk-config`; `POST /v1/client-reports`. Bodies are plain JSON batches.
+- Reads `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` (code, then `OTEL_*`, then the default).
+- Depends on `@newtalaria/core` ^0.6.0.
+
 ## 0.5.4
 
 - Optional `wrapDuckDB` records a CLIENT span and a query breadcrumb for `@duckdb/node-api` (`run`, `stream`, `prepare`, `runAndRead*`, and pending `start`). Bound parameter values and result rows stay in the app. A thrown query calls `captureException` with the sanitized statement.
