@@ -1,0 +1,26 @@
+{
+  "events": [
+    {
+      "name": "Order Completed",
+      "kind": "track",
+      "anonymousId": "anon-1",
+      "sessionId": "sess-1",
+      "timestamp": "2026-10-15T00:00:00.000Z",
+      "eventId": "evt-1",
+      "userId": "user-1",
+      "replayId": "11111111-1111-4111-8111-111111111111",
+      "platform": "javascript",
+      "release": "main@abcdef1",
+      "url": "https://shop.example/checkout",
+      "path": "/checkout",
+      "title": "Checkout",
+      "referrer": "https://shop.example/",
+      "propertiesJson": "{\"total\":42}",
+      "browserName": "Chrome",
+      "osName": "macOS",
+      "device": "desktop",
+      "locale": "en-NZ",
+      "timezone": "Pacific/Auckland"
+    }
+  ]
+}

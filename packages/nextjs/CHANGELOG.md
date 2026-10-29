@@ -8,6 +8,7 @@
 - Depends on `@newtalaria/core`, `@newtalaria/node`, `@newtalaria/react`, and `@newtalaria/cli` ^0.6.0.
 - `withTalariaConfig` tags every event with the release and commit (from options, `TALARIA_RELEASE`, Vercel/GitHub/GitLab/Cloudflare/Render/Netlify/Heroku/Bitbucket/CircleCI env, or git).
 - After `next build` (`compiler.runAfterProductionCompile`), with a `tal_sk_` `TALARIA_RELEASE_KEY`: `POST /v1/releases` creates the release and its commits (max 250); `.next/static` maps are uploaded to `POST /v1/source-maps` as `_next/static/...`, then the public `.map` files are deleted.
+- `POST /v1/releases` always sends `commitSha` as the trimmed 7–40 hex SHA. A value outside that pattern is not posted.
 - New `talaria-nextjs upload` CLI for the same step at deploy time.
 - Adds an empty `turbopack` config so Next 16 builds with Turbopack accept the wrapper.
 

@@ -1,0 +1,41 @@
+{
+  "spans": [
+    {
+      "traceId": "0123456789abcdef0123456789abcdef",
+      "spanId": "0123456789abcdef",
+      "name": "GET /checkout",
+      "kind": "server",
+      "startTime": "2026-10-15T00:00:00.000Z",
+      "endTime": "2026-10-15T00:00:00.120Z",
+      "parentSpanId": "abcdef0123456789",
+      "status": "ok",
+      "statusMessage": "200",
+      "attributes": {
+        "http.method": "GET",
+        "http.route": "/checkout"
+      },
+      "resource": {
+        "service.name": "web"
+      },
+      "events": [
+        {
+          "timestamp": "2026-10-15T00:00:00.050Z",
+          "name": "exception",
+          "attributes": {
+            "exception.type": "Error"
+          }
+        }
+      ],
+      "links": [
+        {
+          "traceId": "fedcba9876543210fedcba9876543210",
+          "spanId": "0123456789abcdef"
+        }
+      ],
+      "release": "main@abcdef1",
+      "anonymousId": "anon-1",
+      "sessionId": "sess-1",
+      "requestId": "req-1"
+    }
+  ]
+}

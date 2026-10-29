@@ -1,0 +1,14 @@
+{
+  "discards": [
+    {
+      "signal": "events",
+      "reason": "sample_rate",
+      "count": 4
+    },
+    {
+      "signal": "replays",
+      "reason": "consent",
+      "count": 1
+    }
+  ]
+}
