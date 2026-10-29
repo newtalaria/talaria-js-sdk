@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased (proposed 0.5.6)
+## 0.6.0
 
 ### TIS v0.2 Naming Lock (Breaking Changes)
 
 **MIGRATION NOTE:** This release implements the Talaria Integration Standard v0.2 naming lock as a hard cut with no backwards compatibility.
 
-- **Configuration:** `url` only. No default host: derive `https://ingest-<cell>.newtalaria.com` from the key unless `url` / `TALARIA_URL` is set. A `self` cell fails fast.
+- **Configuration:** `dsn` is removed. Init takes `url` only. When `url` and `TALARIA_URL` are both unset, the host is `https://ingest-<cell>.newtalaria.com`, derived from the key cell. A `self` cell fails fast.
 - **Environment variables:** 
   - Public prefixes (`NEXT_PUBLIC_` / `VITE_`) only for `TALARIA_URL`, `TALARIA_BROWSER_API_KEY`, `TALARIA_RELEASE`, and `TALARIA_COMMIT_SHA`
   - Server: unprefixed `TALARIA_URL`, `TALARIA_API_KEY` (`tal_sk_`), `TALARIA_RELEASE_KEY` (`tal_sk_`), plus `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES`

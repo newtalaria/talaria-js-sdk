@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased (proposed 0.6.0)
+## 0.6.0
 
+- **Breaking:** `dsn` is removed. Client, server, and edge init take `url` only. When `url` and `TALARIA_URL` are unset, the host is `https://ingest-<cell>.newtalaria.com` from the key cell. `TALARIA_URL` (client: `NEXT_PUBLIC_TALARIA_URL`) overrides that host. A `self` cell requires a URL.
+- **Breaking:** Browser keys are `tal_pk_<env>_<cell>_<43><6>` and server keys are `tal_sk_<env>_<cell>_<43><6>`, both with a CRC32 base62 checksum. Auth is `Authorization: Bearer`. Ingest is v1 REST with plain JSON batches. Errors are `application/problem+json`.
+- **Breaking:** Source-map upload uses `TALARIA_RELEASE_KEY`, which must be a `tal_sk_` key (`releases:write`). It is never the browser key.
+- Depends on `@newtalaria/core`, `@newtalaria/node`, `@newtalaria/react`, and `@newtalaria/cli` ^0.6.0.
 - `withTalariaConfig` tags every event with the release and commit (from options, `TALARIA_RELEASE`, Vercel/GitHub/GitLab/Cloudflare/Render/Netlify/Heroku/Bitbucket/CircleCI env, or git).
 - After `next build` (`compiler.runAfterProductionCompile`), with a `tal_sk_` `TALARIA_RELEASE_KEY`: `POST /v1/releases` creates the release and its commits (max 250); `.next/static` maps are uploaded to `POST /v1/source-maps` as `_next/static/...`, then the public `.map` files are deleted.
 - New `talaria-nextjs upload` CLI for the same step at deploy time.

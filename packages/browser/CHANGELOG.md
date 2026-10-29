@@ -1,10 +1,13 @@
 # Changelog
 
-## Unreleased (proposed 0.5.6)
+## 0.6.0
 
-- Replay segments and heatmap snapshots go as raw gzip to `/ingest/v1/replays/segments` and `/ingest/v1/heatmaps/snapshots` when the server advertises `capabilities.binaryUploads`, instead of base64 inside JSON (about 25% smaller on the wire). Page-close sends keep using the RPCs. If a binary route answers 404, 405 or 415, the SDK switches back to the RPCs for good and resends there.
+- **Breaking:** `dsn` is removed. `Talaria.init` takes `url` and a publishable key `tal_pk_<env>_<cell>_<43><6>` (CRC32 base62 checksum). `tal_sk_` and `tal_mon_` are refused. When `url` is omitted, the host is `https://ingest-<cell>.newtalaria.com` from the key cell. Pass `url` (apps typically set it from `TALARIA_URL`, `NEXT_PUBLIC_TALARIA_URL`, or `VITE_TALARIA_URL`) to override that host. A `self` cell requires `url`.
+- **Breaking:** Ingest is v1 REST with `Authorization: Bearer` and plain JSON batches. Errors are `application/problem+json`. Routes: `POST /v1/events`, `/v1/spans`, `/v1/analytics`, `/v1/flags/evaluate`, `/v1/replays`, `/v1/replays/segments`, `/v1/replays/{replayId}/finish`, `/v1/heatmaps`, `/v1/heatmaps/snapshots`; `GET /v1/sdk-config`; `POST /v1/client-reports`.
+- Depends on `@newtalaria/core` ^0.6.0.
+- Replay segments and heatmap snapshots go as raw gzip to `POST /v1/replays/segments` and `POST /v1/heatmaps/snapshots` when the server advertises `capabilities.binaryUploads`, instead of base64 inside JSON (about 25% smaller on the wire). Page-close sends stay JSON. If a binary route answers 404, 405, or 415, the SDK switches back to JSON for good and resends there.
 - Event titles are `<Type>: <message>` (truncated to 120 characters) instead of the bare exception type, for errors and synthetic network errors.
-- A rejected `replays/start` no longer re-throws from fire-and-forget upload tasks, so it is not captured as a `TransportError` issue; the next flush retries.
+- A rejected `POST /v1/replays` no longer re-throws from fire-and-forget upload tasks, so it is not captured as a `TransportError` issue; the next flush retries.
 
 ## 0.5.4
 

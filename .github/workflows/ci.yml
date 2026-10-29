@@ -17,6 +17,7 @@ jobs:
           - "@newtalaria/node"
           - "@newtalaria/react"
           - "@newtalaria/nextjs"
+          - "@newtalaria/cli"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,7 +25,7 @@ jobs:
           node-version: "20"
           cache: npm
       - run: npm ci
-      - name: Build workspace deps
-        run: npm run build -w @newtalaria/core && npm run build -w @newtalaria/browser
+      - name: Build
+        run: npm run build
       - name: Test
         run: npm run test -w ${{ matrix.workspace }}
