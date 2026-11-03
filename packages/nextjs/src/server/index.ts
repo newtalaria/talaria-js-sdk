@@ -3,6 +3,7 @@ export type { TalariaNodeInitOptions } from '@newtalaria/node/api';
 
 import { getNodeClient, Talaria } from '@newtalaria/node/api';
 import { installOutgoingHttpInstrumentation } from '@newtalaria/node';
+import { logRateLimited } from '@newtalaria/core';
 import type { TalariaNodeInitOptions } from '@newtalaria/node/api';
 
 /**
@@ -11,7 +12,30 @@ import type { TalariaNodeInitOptions } from '@newtalaria/node/api';
  */
 export function initServer(options: TalariaNodeInitOptions): void {
   Talaria.init(options);
-  installOutgoingHttpInstrumentation(getNodeClient());
+  if (!getNodeClient().isEnabled()) return;
+  try {
+    installOutgoingHttpInstrumentation(getNodeClient());
+  } catch (error) {
+    logRateLimited('@newtalaria/nextjs:internal', '@newtalaria/nextjs: http instrumentation failed (ignored)', error);
+  }
+}
+
+/** Start a span; a Talaria fault never reaches the wrapped handler. */
+function safeSpan(name: string, opts: Parameters<typeof Talaria.startSpan>[1]): ReturnType<typeof Talaria.startSpan> {
+  try {
+    return Talaria.startSpan(name, opts);
+  } catch {
+    return null;
+  }
+}
+
+function endSpan(span: ReturnType<typeof Talaria.startSpan>, status: 'ok' | 'error'): void {
+  try {
+    span?.setStatus(status);
+    span?.end();
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -21,13 +45,17 @@ export function captureRequestError(
   error: unknown,
   request: { path?: string; method?: string },
 ): void {
-  void Talaria.captureException(error, {
-    mechanism: { type: 'auto.function.nextjs.on_request_error', handled: false },
-    extra: {
-      path: request.path ?? '',
-      method: request.method ?? '',
-    },
-  });
+  try {
+    void Talaria.captureException(error, {
+      mechanism: { type: 'auto.function.nextjs.on_request_error', handled: false },
+      extra: {
+        path: request?.path ?? '',
+        method: request?.method ?? '',
+      },
+    });
+  } catch {
+    /* Talaria never breaks the request (D19) */
+  }
 }
 
 /** Wrap a Server Action so thrown errors become events. */
@@ -36,18 +64,16 @@ export function withServerAction<T extends (...args: never[]) => Promise<unknown
   action: T,
 ): T {
   const wrapped = (async (...args: never[]) => {
-    const span = Talaria.startSpan(`action ${name}`, {
+    const span = safeSpan(`action ${name}`, {
       kind: 'internal',
       attributes: { 'next.action': name },
     });
     try {
       const result = await action(...args);
-      span?.setStatus('ok');
-      span?.end();
+      endSpan(span, 'ok');
       return result;
     } catch (error) {
-      span?.setStatus('error');
-      span?.end();
+      endSpan(span, 'error');
       await Talaria.captureException(error, {
         mechanism: { type: 'auto.function.nextjs.server_action', handled: false },
         extra: { action: name },
@@ -64,18 +90,16 @@ export function withRouteHandler<T extends (...args: never[]) => Promise<Respons
   handler: T,
 ): T {
   const wrapped = (async (...args: never[]) => {
-    const span = Talaria.startSpan(`route ${name}`, {
+    const span = safeSpan(`route ${name}`, {
       kind: 'server',
       attributes: { 'next.route': name },
     });
     try {
       const result = await handler(...args);
-      span?.setStatus('ok');
-      span?.end();
+      endSpan(span, 'ok');
       return result;
     } catch (error) {
-      span?.setStatus('error');
-      span?.end();
+      endSpan(span, 'error');
       await Talaria.captureException(error, {
         mechanism: { type: 'auto.function.nextjs.route_handler', handled: false },
         extra: { route: name },

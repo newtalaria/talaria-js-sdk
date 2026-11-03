@@ -1,3 +1,4 @@
+import { logRateLimited } from '@newtalaria/core';
 import {
   createSpanId,
   createTraceId,
@@ -289,7 +290,7 @@ export class NodeTracer {
       await ingestSpanBatch(this.options.transport, payload, opts);
     } catch (error) {
       for (const span of ready) span.data.flushed = false;
-      console.warn('@newtalaria/node: POST /v1/spans failed', error);
+      logRateLimited('@newtalaria/node:POST /v1/spans failed', '@newtalaria/node: POST /v1/spans failed', error);
       if (IngestError.fromUnknown(error).isPermanent) {
         this.disabled = true;
         this.options.onPermanentIngestError?.(error);

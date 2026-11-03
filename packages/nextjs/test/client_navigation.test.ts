@@ -57,7 +57,9 @@ describe('initClient navigation listeners', () => {
     const navigations: NavCall[] = [];
     const originalInit = Talaria.init;
     const originalStart = Talaria.startNavigation;
+    const originalEnabled = Talaria.isEnabled;
     Talaria.init = () => {};
+    Talaria.isEnabled = () => true;
     Talaria.startNavigation = (opts) => {
       navigations.push({ name: opts?.name, url: opts?.url });
     };
@@ -93,6 +95,22 @@ describe('initClient navigation listeners', () => {
     } finally {
       Talaria.init = originalInit;
       Talaria.startNavigation = originalStart;
+      Talaria.isEnabled = originalEnabled;
+      env.restore();
+    }
+  });
+
+  it('installs no listeners when the key is invalid (D19)', () => {
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    const env = installWindow('/');
+    try {
+      assert.doesNotThrow(() => initClient({ apiKey: 'tal_live_old_key' }));
+      assert.equal(Talaria.isEnabled(), false);
+      assert.equal(env.popstate.length, 0);
+      assert.equal(env.currentchange.length, 0);
+    } finally {
+      console.warn = originalWarn;
       env.restore();
     }
   });

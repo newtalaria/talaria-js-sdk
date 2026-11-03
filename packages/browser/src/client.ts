@@ -13,7 +13,10 @@ import type {
 import { createId } from './utils/id.js';
 import {
   assertBrowserCredential,
+  errorMessage,
+  logRateLimited,
   readProcessReleaseEnv,
+  warnDisabledOnce,
   resolveIngestUrl,
   resolveReleaseIdentity,
 } from '@newtalaria/core';
@@ -344,10 +347,30 @@ function normalizeLoggerPresets(
   return out;
 }
 
+const LOG_LABEL = '@newtalaria/browser';
+
+/** The raw key for the disabled warning (only its first 8 characters are logged). */
+function readKey(options: unknown): string | undefined {
+  try {
+    const key = (options as { apiKey?: unknown } | null | undefined)?.apiKey;
+    return typeof key === 'string' ? key : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Throws on a bad key or option. `init` catches it and disables Talaria (D19). */
 function resolveOptions(options: TalariaInitOptions): ResolvedOptions {
-  const apiKey = options.apiKey?.trim() ?? '';
+  if (!options || typeof options !== 'object') {
+    throw new Error('init options must be an object');
+  }
+  const rawKey: unknown = options.apiKey;
+  if (rawKey !== undefined && rawKey !== null && typeof rawKey !== 'string') {
+    throw new Error('`apiKey` must be a string');
+  }
+  const apiKey = (rawKey ?? '').trim();
   if (!apiKey) {
-    throw new Error('@newtalaria/browser: init requires `apiKey`');
+    throw new Error('no API key (pass `apiKey`)');
   }
   assertBrowserCredential(apiKey);
   const baseUrl = resolveIngestUrl({ apiKey, url: options.url });
@@ -568,20 +591,90 @@ export class TalariaClient {
   private flagsClient: TalariaFlags | null = null;
   private heatmaps: HeatmapRecorder | null = null;
   private eventQueue: EventIngestQueue | null = null;
+  /** Set when init disabled Talaria (bad key or option). */
+  private disabledReason: string | null = null;
 
+  /**
+   * Never throws (D19). A missing or invalid key, a bad option, or any other
+   * init fault leaves a disabled client: no network, no global handlers, and
+   * every public method is a no-op. One warning per page.
+   */
   init(options: TalariaInitOptions): void {
     if (this.options) {
       console.warn('@newtalaria/browser: already initialized');
       return;
     }
+    let resolved: ResolvedOptions;
+    try {
+      resolved = resolveOptions(options);
+    } catch (error) {
+      this.disabledReason = errorMessage(error);
+      warnDisabledOnce(LOG_LABEL, this.disabledReason, readKey(options));
+      return;
+    }
+    this.disabledReason = null;
+    try {
+      this.start(resolved);
+    } catch (error) {
+      this.abandonInit();
+      this.disabledReason = `init failed (${errorMessage(error)})`;
+      warnDisabledOnce(LOG_LABEL, this.disabledReason, resolved.apiKey);
+    }
+  }
 
-    this.options = resolveOptions(options);
+  /** True after a successful `init` and until `close`. */
+  isEnabled(): boolean {
+    return this.options !== null && !this.ingestDisabled;
+  }
+
+  /** Why init left Talaria disabled, or null. */
+  getDisabledReason(): string | null {
+    return this.disabledReason;
+  }
+
+  /** Undo a half-finished `init` synchronously. Never throws. */
+  private abandonInit(): void {
+    for (const teardown of this.teardowns.splice(0).reverse()) {
+      try {
+        teardown();
+      } catch {
+        /* ignore */
+      }
+    }
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    try {
+      this.clearErrorClipTimer();
+      this.clearMaxDurationTimer();
+      this.clearPageloadTimers();
+      this.recorder?.stop();
+      this.flagsClient?.close();
+      this.heatmaps?.stop();
+    } catch {
+      /* ignore */
+    }
+    this.recorder = null;
+    this.flagsClient = null;
+    this.heatmaps = null;
+    this.tracer = null;
+    this.analyticsFacade = null;
+    this.eventQueue = null;
+    this.transport = null;
+    this.options = null;
+    this.uploadEnabled = false;
+    this.sessionSampled = false;
+  }
+
+  private start(resolved: ResolvedOptions): void {
+    this.options = resolved;
     this.transport = new ServerpodTransport({
       baseUrl: this.options.baseUrl,
       apiKey: this.options.apiKey,
     });
     this.eventQueue = EventIngestQueue.forTransport(this.transport, (error) => {
-      console.warn('@newtalaria/browser: event ingest failed', error);
+      logRateLimited(`${LOG_LABEL}:events`, '@newtalaria/browser: event ingest failed', error);
       if (isPermanentIngestError(error)) {
         this.disableIngestAfterPermanentError(error, 'events');
       }
@@ -899,6 +992,9 @@ export class TalariaClient {
         if (!tombstone || !this.options) return;
         writePolicyCache(storage, this.options.apiKey, tombstone);
         this.stopForInactivePolicy();
+      })
+      .catch((error: unknown) => {
+        logRateLimited(`${LOG_LABEL}:policy`, '@newtalaria/browser: sdk-config failed (ignored)', error);
       });
   }
 
@@ -1024,6 +1120,8 @@ export class TalariaClient {
   get analytics(): AnalyticsFacade {
     if (!this.analyticsFacade) {
       this.analyticsFacade = this.createAnalyticsFacade();
+      // Before init or after a failed init: a kill-switched no-op facade.
+      if (!this.options) this.analyticsFacade.disable();
     }
     return this.analyticsFacade;
   }
@@ -1058,14 +1156,12 @@ export class TalariaClient {
     });
   }
 
+  /** Before init or after a failed init this is a disabled no-op client. */
   private createFlagsClient(): TalariaFlags {
-    if (!this.options || !this.identity) {
-      throw new Error('@newtalaria/browser: call Talaria.init() first');
-    }
     const storage = createWebStorage();
     return new TalariaFlags({
-      apiKey: this.options.apiKey,
-      identity: this.identity,
+      apiKey: this.options?.apiKey ?? '',
+      identity: this.identity ?? new IdentityStore(storage),
       storage,
       getTransport: () => this.transport,
       isEnabled: () => Boolean(this.options?.enableFlags),
@@ -1199,7 +1295,12 @@ export class TalariaClient {
   }
 
   addBreadcrumb(crumb: Partial<import('./types.js').Breadcrumb> & { type?: string; message?: string }): void {
-    this.breadcrumbs.add(normalizeBreadcrumb(crumb));
+    if (!this.options) return;
+    try {
+      this.breadcrumbs.add(normalizeBreadcrumb(crumb));
+    } catch (error) {
+      logRateLimited(`${LOG_LABEL}:internal`, '@newtalaria/browser: addBreadcrumb failed (ignored)', error);
+    }
   }
 
   startSpan(name: string, opts?: { kind?: import('@newtalaria/core').SpanKind; attributes?: Record<string, string | number | boolean> }): Span | null {
@@ -1212,6 +1313,7 @@ export class TalariaClient {
 
   /** Record an SPA / App Router navigation as a new transaction. */
   startNavigation(opts?: { name?: string; url?: string }): void {
+    if (!this.options) return;
     const loc = currentLocation();
     const path = opts?.name || loc?.pathname || '/';
     if (this.lastNavigationPath === path) return;
@@ -1252,7 +1354,19 @@ export class TalariaClient {
     context: CaptureContext | undefined,
     respectMinLevel: boolean,
   ): Promise<void> {
-    if (this.capturing || this.ingestDisabled) return;
+    if (!this.options || this.capturing || this.ingestDisabled) return;
+    try {
+      await this.captureExceptionUnsafe(error, context, respectMinLevel);
+    } catch (fault) {
+      logRateLimited(`${LOG_LABEL}:capture`, '@newtalaria/browser: capture failed (ignored)', fault);
+    }
+  }
+
+  private async captureExceptionUnsafe(
+    error: unknown,
+    context: CaptureContext | undefined,
+    respectMinLevel: boolean,
+  ): Promise<void> {
 
     const err =
       error instanceof Error
@@ -1337,15 +1451,19 @@ export class TalariaClient {
     context: CaptureContext | undefined,
     respectMinLevel: boolean,
   ): Promise<void> {
-    if (this.ingestDisabled) return;
-    await this.capture({
-      message,
-      level,
-      title: context?.title,
-      context,
-      platform: PLATFORM_JAVASCRIPT,
-      respectMinLevel,
-    });
+    if (!this.options || this.ingestDisabled) return;
+    try {
+      await this.capture({
+        message,
+        level,
+        title: context?.title,
+        context,
+        platform: PLATFORM_JAVASCRIPT,
+        respectMinLevel,
+      });
+    } catch (fault) {
+      logRateLimited(`${LOG_LABEL}:capture`, '@newtalaria/browser: capture failed (ignored)', fault);
+    }
   }
 
   debug(message: string, context?: CaptureContext): Promise<void> {
@@ -1445,12 +1563,25 @@ export class TalariaClient {
     return this.logger({ tags });
   }
 
+  /** Never rejects: transport faults are logged, rate-limited. */
   async flush(opts?: {
     reason?: string;
     keepalive?: boolean;
     finish?: boolean;
   }): Promise<void> {
     if (!this.options || this.closed) return;
+    try {
+      await this.flushUnsafe(opts);
+    } catch (error) {
+      logRateLimited(`${LOG_LABEL}:flush`, '@newtalaria/browser: flush failed (ignored)', error);
+    }
+  }
+
+  private async flushUnsafe(opts?: {
+    reason?: string;
+    keepalive?: boolean;
+    finish?: boolean;
+  }): Promise<void> {
 
     const keepalive = opts?.keepalive ?? false;
     await this.eventQueue?.flush({ keepalive });
@@ -1552,7 +1683,7 @@ export class TalariaClient {
       try {
         await this.flush({ reason: 'close', finish: true });
       } catch (error) {
-        console.warn('@newtalaria/browser: close flush failed', error);
+        logRateLimited('@newtalaria/browser:close flush failed', '@newtalaria/browser: close flush failed', error);
       }
     }
     try {
@@ -1617,7 +1748,17 @@ export class TalariaClient {
     }
   }
 
-  private async capture(args: {
+  /** Never rejects (D19): internal callers use `void this.capture(...)`. */
+  private async capture(args: Parameters<TalariaClient['captureUnsafe']>[0]): Promise<void> {
+    if (!this.options || !this.transport || this.ingestDisabled) return;
+    try {
+      await this.captureUnsafe(args);
+    } catch (fault) {
+      logRateLimited(`${LOG_LABEL}:capture`, '@newtalaria/browser: capture failed (ignored)', fault);
+    }
+  }
+
+  private async captureUnsafe(args: {
     message: string;
     level: SeverityLevel;
     title?: string;
@@ -1629,10 +1770,7 @@ export class TalariaClient {
     /** When false, skip client minLevel gate (scoped logger already filtered). Default true. */
     respectMinLevel?: boolean;
   }): Promise<void> {
-    if (!this.options || !this.transport) {
-      throw new Error('@newtalaria/browser: call Talaria.init() first');
-    }
-    if (this.ingestDisabled) return;
+    if (!this.options || !this.transport || this.ingestDisabled) return;
 
     this.touchIdentity();
 
@@ -1689,7 +1827,7 @@ export class TalariaClient {
           isException: Boolean(args.exception),
         });
       } catch (error) {
-        console.warn('@newtalaria/browser: beforeSend failed', error);
+        logRateLimited('@newtalaria/browser:beforeSend failed', '@newtalaria/browser: beforeSend failed', error);
         return;
       }
       if (result === null) return;
@@ -1754,7 +1892,7 @@ export class TalariaClient {
       try {
         await this.flush({ reason: 'capture', keepalive: args.keepalive });
       } catch (error) {
-        console.warn('@newtalaria/browser: replay flush failed', error);
+        logRateLimited('@newtalaria/browser:replay flush failed', '@newtalaria/browser: replay flush failed', error);
         this.lastReplayCaptureFailure = {
           reason: 'upload_failed',
           details: {
@@ -1875,7 +2013,7 @@ export class TalariaClient {
       // Do not rethrow — callers use `void captureException(...)` and a
       // rejected promise becomes unhandledrejection, which we would re-ingest
       // as a fake "Failed to fetch" app error (SDK stack only).
-      console.warn('@newtalaria/browser: event ingest failed', error);
+      logRateLimited(`${LOG_LABEL}:events`, '@newtalaria/browser: event ingest failed', error);
       if (isPermanentIngestError(error)) {
         this.disableIngestAfterPermanentError(error, 'events');
       }
@@ -2200,7 +2338,7 @@ export class TalariaClient {
         });
         this.finishedOnServer = true;
       } catch (error) {
-        console.warn('@newtalaria/browser: replays/finish failed after abort', error);
+        logRateLimited('@newtalaria/browser:replays/finish failed after abort', '@newtalaria/browser: replays/finish failed after abort', error);
       }
     }
 
@@ -2545,7 +2683,7 @@ export class TalariaClient {
     // Upload tasks are often started with `void`; a failure must not surface as an
     // unhandled rejection (the global handler would capture the SDK's own transport error).
     this.uploadChain = this.uploadChain.then(task, task).catch((error: unknown) => {
-      console.warn('@newtalaria/browser: replay upload failed', error);
+      logRateLimited('@newtalaria/browser:replay upload failed', '@newtalaria/browser: replay upload failed', error);
     });
     return this.uploadChain;
   }
@@ -2576,7 +2714,7 @@ export class TalariaClient {
       // Never re-throw: callers run this from fire-and-forget upload tasks, so a rejected
       // replays/start became an unhandled rejection and was filed as a TransportError issue.
       // startedOnServer stays false, so segment upload skips and the next flush retries.
-      console.warn('@newtalaria/browser: replays/start failed', error);
+      logRateLimited('@newtalaria/browser:replays/start failed', '@newtalaria/browser: replays/start failed', error);
     }
   }
 
@@ -2880,7 +3018,7 @@ export class TalariaClient {
     }
 
     this.buffer.prepend(events);
-        console.warn('@newtalaria/browser: v1/replays/segments failed', error);
+        logRateLimited('@newtalaria/browser:v1/replays/segments failed', '@newtalaria/browser: v1/replays/segments failed', error);
     if (isPermanentIngestError(error)) {
       this.disableIngestAfterPermanentError(error, 'replay');
       return 'stop';
@@ -2996,7 +3134,7 @@ export class TalariaClient {
       });
       this.finishedOnServer = true;
     } catch (error) {
-      console.warn('@newtalaria/browser: replays/finish failed', error);
+      logRateLimited('@newtalaria/browser:replays/finish failed', '@newtalaria/browser: replays/finish failed', error);
     }
   }
 }

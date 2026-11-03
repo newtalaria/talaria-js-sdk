@@ -127,7 +127,9 @@ export function mintCredential(opts: {
 
 /**
  * Explicit `url` (option or TALARIA_URL) wins. Otherwise derive
- * `https://ingest-<cell>.newtalaria.com`. A `self` cell or a bad key fails fast.
+ * `https://ingest-<cell>.newtalaria.com`. Throws on a `self` cell without a
+ * url or a bad key. Init paths catch this and disable Talaria (D19); the host
+ * app never sees it.
  */
 export function resolveIngestUrl(opts: { apiKey: string; url?: string }): string {
   const parsed = parseCredential(opts.apiKey);

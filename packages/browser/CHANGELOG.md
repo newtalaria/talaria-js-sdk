@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.1
+
+- Fail safe (Talaria D19): `Talaria.init` never throws. A missing, empty, malformed or wrong-checksum key, a `tal_sk_` key, a `self` cell without `url`, or bad options leave a disabled client: no network, no global handlers, no timers, and every public method is a no-op. One warning per page, with at most 8 key characters.
+- `Talaria.isEnabled()` and `TalariaClient.getDisabledReason()`.
+- `Talaria.flags` and `Talaria.analytics` before init (or after a failed init) are disabled no-ops instead of throwing.
+- Capture, flush and close never reject. Transport errors (4xx, 5xx, timeouts, network) are logged at most once per minute per kind.
+- Depends on `@newtalaria/core` ^0.6.1.
+
 ## 0.6.0
 
 - **Breaking:** `dsn` is removed. `Talaria.init` takes `url` and a publishable key `tal_pk_<env>_<cell>_<43><6>` (CRC32 base62 checksum). `tal_sk_` and `tal_mon_` are refused. When `url` is omitted, the host is `https://ingest-<cell>.newtalaria.com` from the key cell. Pass `url` (apps typically set it from `TALARIA_URL`, `NEXT_PUBLIC_TALARIA_URL`, or `VITE_TALARIA_URL`) to override that host. A `self` cell requires `url`.

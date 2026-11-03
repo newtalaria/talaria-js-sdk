@@ -12,7 +12,7 @@ export async function main(argv: string[]): Promise<number> {
   const args = [...argv];
   if (args[0] !== 'upload') {
     console.error(USAGE);
-    return args[0] === '--help' || args[0] === '-h' ? 0 : 1;
+    return args[0] === '--help' || args[0] === '-h' ? 0 : 2;
   }
   args.shift();
   const opts: Record<string, string> = {};
@@ -22,7 +22,7 @@ export async function main(argv: string[]): Promise<number> {
     if (a === '--keep-maps') { keepMaps = true; continue; }
     const key = a.replace(/^--/, '');
     const value = args[i + 1];
-    if (!a.startsWith('--') || !value || value.startsWith('--')) { console.error(`Bad flag ${a}\n${USAGE}`); return 1; }
+    if (!a.startsWith('--') || !value || value.startsWith('--')) { console.error(`Bad flag ${a}\n${USAGE}`); return 2; }
     opts[key] = value;
     i++;
   }
@@ -38,7 +38,12 @@ export async function main(argv: string[]): Promise<number> {
     deleteSourceMaps: !keepMaps,
   });
   console.log(JSON.stringify(result));
-  return result.skipped || !result.mapsUploaded ? 1 : 0;
+  // Only a usage error is non-zero. A missing or invalid key, an unreachable Talaria or a failed
+  // upload is logged and the deploy continues (D19).
+  if (result.skipped || !result.mapsUploaded) {
+    console.warn('[talaria] source maps were not all uploaded; continuing (Talaria never fails a build)');
+  }
+  return 0;
 }
 
 const isMain = process.argv[1] && /talaria-nextjs|cli\.js$/.test(process.argv[1]);

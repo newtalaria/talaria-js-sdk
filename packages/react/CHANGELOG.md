@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Fail safe (Talaria D19): `ErrorBoundary`, `reactErrorHandler`, `Profiler` and `instrumentReactRouter` catch their own Talaria errors, so a Talaria fault never breaks a render, and `onError` / `after` always run.
+- Depends on `@newtalaria/browser` ^0.6.1.
+
 ## 0.6.0
 
 - **Breaking:** `dsn` is removed. `Talaria.init` takes `url` and a `tal_pk_<env>_<cell>_<43><6>` key (CRC32 base62 checksum). `tal_sk_` and `tal_mon_` are refused. When `url` is omitted, the host is `https://ingest-<cell>.newtalaria.com` from the key cell. `url` (from `TALARIA_URL` / `NEXT_PUBLIC_TALARIA_URL` / `VITE_TALARIA_URL`) overrides that host.

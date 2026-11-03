@@ -5,6 +5,7 @@ import { gzipSync } from 'node:zlib';
 import {
   ServerpodTransport,
   assertReleaseCredential,
+  keyPreview,
   resolveIngestUrl,
   resolveReleaseIdentity,
 } from '@newtalaria/core';
@@ -32,7 +33,43 @@ interface ParsedArgs {
   deleteAfterUpload: boolean;
 }
 
+/** Every map uploaded (or nothing to do). */
+export const UPLOAD_OK = 0;
+/** Talaria side: no or invalid key, unreachable, or some maps failed. A build never fails on this (D19). */
+export const UPLOAD_INCOMPLETE = 1;
+/** The command line itself is wrong. */
+export const UPLOAD_USAGE = 2;
+
+/**
+ * Upload built source maps. Never throws: returns {@link UPLOAD_OK},
+ * {@link UPLOAD_INCOMPLETE} or {@link UPLOAD_USAGE}.
+ */
 export async function uploadSourceMaps(
+  options: UploadSourceMapsOptions,
+): Promise<number> {
+  const error = options.error ?? ((line: string) => console.error(line));
+  try {
+    return await uploadSourceMapsUnsafe(options);
+  } catch (err) {
+    error(`source map upload failed: ${err instanceof Error ? err.message : String(err)}`);
+    return UPLOAD_INCOMPLETE;
+  }
+}
+
+/**
+ * Exit code for the `talaria` bin: only a usage error is non-zero. A missing
+ * or invalid key, an unreachable Talaria, or a failed upload warns and exits 0
+ * so a deploy never fails because of Talaria (D19).
+ */
+export function exitCodeFor(code: number, warn: (line: string) => void = (l) => console.error(l)): number {
+  if (code === UPLOAD_USAGE) return UPLOAD_USAGE;
+  if (code !== UPLOAD_OK) {
+    warn('[talaria] source maps were not all uploaded; continuing (Talaria never fails a build)');
+  }
+  return 0;
+}
+
+async function uploadSourceMapsUnsafe(
   options: UploadSourceMapsOptions,
 ): Promise<number> {
   const log = options.log ?? ((line: string) => console.log(line));
@@ -42,7 +79,7 @@ export async function uploadSourceMaps(
     parsed = parseArgs(options.argv);
   } catch (err) {
     error(err instanceof Error ? err.message : String(err));
-    return 1;
+    return UPLOAD_USAGE;
   }
 
   const explicitUrl = parsed.url || options.env.TALARIA_URL;
@@ -56,22 +93,23 @@ export async function uploadSourceMaps(
     error(
       'Set TALARIA_RELEASE_KEY to a tal_sk_ releases:write key, or pass --api-key.',
     );
-    return 1;
+    return UPLOAD_INCOMPLETE;
   }
   let url: string;
   try {
     assertReleaseCredential(apiKey);
     url = resolveIngestUrl({ apiKey, url: explicitUrl });
   } catch (err) {
-    error(err instanceof Error ? err.message : String(err));
-    return 1;
+    const preview = keyPreview(apiKey);
+    error(`${err instanceof Error ? err.message : String(err)}${preview ? ` (key "${preview}")` : ''}`);
+    return UPLOAD_INCOMPLETE;
   }
 
   const root = path.resolve(options.cwd, parsed.path);
   const maps = await collectMaps(root);
   if (maps.length === 0) {
     error(`No JavaScript source maps under ${root}`);
-    return 1;
+    return UPLOAD_INCOMPLETE;
   }
 
   log(`${url} release ${release}`);
@@ -126,7 +164,7 @@ export async function uploadSourceMaps(
       error(`${fileName}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-  return failed === 0 ? 0 : 1;
+  return failed === 0 ? UPLOAD_OK : UPLOAD_INCOMPLETE;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {

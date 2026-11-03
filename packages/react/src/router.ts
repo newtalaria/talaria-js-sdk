@@ -16,13 +16,22 @@ export interface SubscribableRouter {
  * Optional — `react-router` is a peer dependency.
  */
 export function instrumentReactRouter(router: SubscribableRouter): () => void {
+  // A Talaria fault never breaks routing (D19).
+  const navigate = (opts: { name: string; url?: string }) => {
+    try {
+      Talaria.startNavigation(opts);
+    } catch {
+      /* ignore */
+    }
+  };
   const initial = router.state?.location.pathname;
   if (initial) {
-    Talaria.startNavigation({ name: initial });
+    navigate({ name: initial });
   }
   return router.subscribe((state) => {
-    const loc = state.location;
-    Talaria.startNavigation({
+    const loc = state?.location;
+    if (!loc) return;
+    navigate({
       name: loc.pathname,
       url: `${loc.pathname}${loc.search ?? ''}${loc.hash ?? ''}`,
     });

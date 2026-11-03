@@ -27,6 +27,8 @@ import type { TalariaInitOptions } from '@newtalaria/react';
  */
 export function initClient(options: TalariaInitOptions): void {
   Talaria.init(options);
+  // Disabled (bad or missing key): no listeners, nothing sent (D19).
+  if (!Talaria.isEnabled()) return;
   const win = globalThis.window;
   if (typeof win === 'undefined') return;
   let last = win.location.pathname;
@@ -34,10 +36,14 @@ export function initClient(options: TalariaInitOptions): void {
     const path = win.location.pathname;
     if (path === last) return;
     last = path;
-    Talaria.startNavigation({
-      name: path,
-      url: win.location.href,
-    });
+    try {
+      Talaria.startNavigation({
+        name: path,
+        url: win.location.href,
+      });
+    } catch {
+      /* ignore */
+    }
   };
   win.addEventListener('popstate', notify);
   const navigation = (

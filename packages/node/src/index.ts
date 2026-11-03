@@ -27,6 +27,7 @@ export {
   instrumentOutgoingHttp,
 } from './http.js';
 
+import { logRateLimited } from '@newtalaria/core';
 import { getNodeClient, Talaria as ApiTalaria } from './api.js';
 import { attachRequestListener } from './http.js';
 import { installOutgoingHttpInstrumentation } from './outgoing.js';
@@ -51,7 +52,12 @@ export const Talaria = {
   ...apiMethods(ApiTalaria),
   init(options: TalariaNodeInitOptions): void {
     ApiTalaria.init(options);
-    installOutgoingHttpInstrumentation(getNodeClient());
+    if (!getNodeClient().isEnabled()) return;
+    try {
+      installOutgoingHttpInstrumentation(getNodeClient());
+    } catch (error) {
+      logRateLimited('@newtalaria/node:internal', '@newtalaria/node: http instrumentation failed (ignored)', error);
+    }
   },
   get analytics() {
     return getNodeClient().analytics;
@@ -63,9 +69,13 @@ export const Talaria = {
 
 /** Start a SERVER span for this request and reset state when the response finishes. */
 export function handleHttpRequest(req: IncomingMessage, res: ServerResponse): void {
-  const tracer = getNodeClient().getTracer();
-  if (!tracer) return;
-  attachRequestListener(req, res, tracer);
+  try {
+    const tracer = getNodeClient().getTracer();
+    if (!tracer) return;
+    attachRequestListener(req, res, tracer);
+  } catch (error) {
+    logRateLimited('@newtalaria/node:internal', '@newtalaria/node: request instrumentation failed (ignored)', error);
+  }
 }
 
 export { wrapDuckDB, wrapMysql2, wrapPg, wrapQueryable, wrapRedis } from './db/index.js';

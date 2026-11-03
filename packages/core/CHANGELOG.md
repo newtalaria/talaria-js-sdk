@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Fail safe (Talaria D19): new `keyPreview`, `warnDisabledOnce`, `logRateLimited`, `guard`, `guardAsync` and `resetFailSafe` helpers. SDKs log one "Talaria is disabled" warning per process (per page in the browser), showing at most the key's first 8 characters, and log transport faults at most once per channel per minute.
+- `EventIngestQueue` keeps draining when an error callback throws or an earlier flush failed. Analytics and flag transport failures are logged rate-limited.
+
 ## 0.6.0
 
 ### TIS v0.2 Naming Lock (Breaking Changes)

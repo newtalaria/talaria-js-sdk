@@ -1,6 +1,6 @@
 import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { ServerpodTransport, assertReleaseCredential, resolveIngestUrl } from '@newtalaria/core';
+import { ServerpodTransport, assertReleaseCredential, keyPreview, resolveIngestUrl } from '@newtalaria/core';
 import { hideMap, mapOwners, uploadSourceMaps } from '@newtalaria/cli';
 import { collectCommits, resolveBuildRelease, type ReleaseCommit } from './release.js';
 
@@ -62,6 +62,35 @@ export interface FinalizeResult {
  * Never throws: a failed upload must not fail the build; problems are logged and returned.
  */
 export async function finalizeTalariaRelease(options: FinalizeOptions): Promise<FinalizeResult> {
+  const error = options.error ?? ((l: string) => console.warn(`[talaria] ${l}`));
+  try {
+    return await finalizeUnsafe(options);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    error(`source map upload skipped: ${message}. The build continues.`);
+    const result: FinalizeResult = {
+      skipped: message,
+      releaseCreated: false,
+      commitsSent: 0,
+      commitsSupported: true,
+      mapsUploaded: false,
+      mapsHidden: 0,
+    };
+    // Public maps must still not be served.
+    if (options.deleteSourceMaps !== false) {
+      try {
+        result.mapsHidden = await hideAllMaps(
+          path.join(options.projectDir, options.distDir ?? '.next', 'static'),
+        );
+      } catch (hideError) {
+        error(`could not delete source maps: ${hideError instanceof Error ? hideError.message : String(hideError)}`);
+      }
+    }
+    return result;
+  }
+}
+
+async function finalizeUnsafe(options: FinalizeOptions): Promise<FinalizeResult> {
   const env = options.env ?? process.env;
   const log = options.log ?? ((l: string) => console.log(`[talaria] ${l}`));
   const error = options.error ?? ((l: string) => console.warn(`[talaria] ${l}`));
@@ -89,7 +118,8 @@ export async function finalizeTalariaRelease(options: FinalizeOptions): Promise<
     url = resolveIngestUrl({ apiKey: apiKey!, url: options.url ?? env.TALARIA_URL });
   } catch (err) {
     result.skipped = err instanceof Error ? err.message : String(err);
-    error(`source map upload skipped: ${result.skipped}`);
+    const preview = keyPreview(apiKey);
+    error(`source map upload skipped: ${result.skipped}${preview ? ` (key "${preview}")` : ''}`);
     if (deleteMaps) result.mapsHidden = await hideAllMaps(staticDir);
     return result;
   }

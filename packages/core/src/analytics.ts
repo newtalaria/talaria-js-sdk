@@ -1,3 +1,4 @@
+import { logRateLimited } from './fail_safe.js';
 import { createId } from './utils/id.js';
 import {
   IdentityStore,
@@ -302,7 +303,11 @@ export class AnalyticsFacade {
       try {
         await ingestAnalyticsEventBatch(transport, batch, opts);
       } catch (error) {
-        console.warn(`${this.bindings.logLabel}: analytics ingest failed`, error);
+        logRateLimited(
+          `${this.bindings.logLabel}:analytics`,
+          `${this.bindings.logLabel}: analytics ingest failed`,
+          error,
+        );
         const parsed = IngestError.fromUnknown(error);
         if (parsed.isScopeOnly || parsed.isPermanent) {
           this.killed = true;

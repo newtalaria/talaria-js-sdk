@@ -1,3 +1,4 @@
+import { logRateLimited } from '../fail_safe.js';
 import type { AnalyticsFacade } from '../analytics.js';
 import type { IdentityStore, IdentityStorage } from '../identity.js';
 import { keyHash } from '../policy/sdk_policy.js';
@@ -302,7 +303,11 @@ export class TalariaFlags {
       }
       this.onFlagsChanged?.(snapshot);
     } catch (error) {
-      console.warn(`${this.logLabel}: flags evaluate failed`, error);
+      logRateLimited(
+        `${this.logLabel}:flags`,
+        `${this.logLabel}: flags evaluate failed`,
+        error,
+      );
     } finally {
       resolveInFlight();
       this.inFlight = null;

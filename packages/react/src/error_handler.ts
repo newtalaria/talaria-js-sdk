@@ -20,12 +20,17 @@ export function reactErrorHandler(
   after?: (error: unknown, errorInfo: ReactErrorInfo) => void,
 ): (error: unknown, errorInfo: ReactErrorInfo) => void {
   return (error, errorInfo) => {
-    void Talaria.captureException(error, {
-      mechanism: { type: 'react', handled: false },
-      extra: {
-        componentStack: errorInfo.componentStack ?? '',
-      },
-    });
+    // A Talaria fault never reaches React or skips `after` (D19).
+    try {
+      void Talaria.captureException(error, {
+        mechanism: { type: 'react', handled: false },
+        extra: {
+          componentStack: errorInfo?.componentStack ?? '',
+        },
+      }).catch(() => undefined);
+    } catch {
+      /* ignore */
+    }
     after?.(error, errorInfo);
   };
 }

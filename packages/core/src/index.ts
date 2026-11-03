@@ -47,6 +47,16 @@ export {
   type EvaluateFlagsInput,
 } from './transport/flags.js';
 export {
+  TRANSPORT_LOG_INTERVAL_MS,
+  errorMessage,
+  guard,
+  guardAsync,
+  keyPreview,
+  logRateLimited,
+  resetFailSafe,
+  warnDisabledOnce,
+} from './fail_safe.js';
+export {
   assertBrowserCredential,
   assertReleaseCredential,
   assertServerCredential,
