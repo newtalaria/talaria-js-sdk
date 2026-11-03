@@ -41,3 +41,15 @@ Browser only: rrweb → replays/start|ingestSegmentBatch|finish
 - Do not pull `@newtalaria/node` into `@newtalaria/nextjs/client`
 - Do not compute fingerprints
 - Do not call `events/ingest` — always `ingestBatch`
+
+## Fail safe (Talaria workspace D19)
+
+Decided by Heath (2026-11-03): "having an invalid Talaria key shouldnt stop the site from building. It should just stop Talaria working". That is the default for every SDK. Full rule: `.cursor/skills/sdk-fail-safe/SKILL.md` in `dunatron/talaria-workspace`.
+
+- Init never throws. A missing, empty, malformed, wrong-checksum or revoked key, or any bad init option, builds a disabled no-op client. Every public method returns normally and sends nothing.
+- Log one warning per process, showing at most the key's first 8 characters.
+- Keep the key grammar strict. A parse failure disables Talaria. It is never an exception the host app sees.
+- Transport errors (4xx, 5xx, timeouts, DNS, TLS) never reach host code. Log them rate-limited.
+- Framework hooks (factories, providers, middleware, log handlers, error hooks) catch their own Talaria errors, so a Talaria fault never becomes a 500 or a crash.
+- Builds and install steps never fail because of Talaria.
+- Tests: no key, empty key, malformed key, wrong checksum and bad option each give no throw, a no-op client and one warning. Transport 401, 500 and timeout never reach the caller.
