@@ -20,14 +20,19 @@ export function Profiler({ id, children }: ProfilerProps): ReactNode {
     _phase,
     actualDuration,
   ) => {
-    const span = Talaria.startInactiveSpan(`ui.react.${profileId}`, {
-      kind: 'internal',
-      attributes: {
-        'ui.component_name': profileId,
-        'ui.render.duration_ms': actualDuration,
-      },
-    });
-    span?.end();
+    // A Talaria fault never breaks the render (D19).
+    try {
+      const span = Talaria.startInactiveSpan(`ui.react.${profileId}`, {
+        kind: 'internal',
+        attributes: {
+          'ui.component_name': profileId,
+          'ui.render.duration_ms': actualDuration,
+        },
+      });
+      span?.end();
+    } catch {
+      /* ignore */
+    }
   };
 
   return (

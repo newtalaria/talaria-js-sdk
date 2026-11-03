@@ -1,5 +1,5 @@
 import { finalizeTalariaRelease, type FinalizeOptions } from '../build/finalize.js';
-import { resolveBuildRelease } from '../build/release.js';
+import { resolveBuildRelease, type BuildRelease } from '../build/release.js';
 
 export { finalizeTalariaRelease, hideAllMaps } from '../build/finalize.js';
 export type { FinalizeOptions, FinalizeResult } from '../build/finalize.js';
@@ -64,7 +64,14 @@ export function withTalariaConfig<T extends object>(
   const env = process.env;
   const hide = options.hideSourceMaps !== false;
   const log = options.silent ? () => {} : (l: string) => console.log(`[talaria] ${l}`);
-  const identity = resolveBuildRelease({ release: options.release, commitSha: options.commitSha, env });
+  const warn = options.silent ? () => {} : (l: string) => console.warn(`[talaria] ${l}`);
+  // Talaria never fails a build (D19): a release lookup fault only drops the release tag.
+  let identity: BuildRelease = { source: 'none' };
+  try {
+    identity = resolveBuildRelease({ release: options.release, commitSha: options.commitSha, env });
+  } catch (err) {
+    warn(`release lookup failed (${err instanceof Error ? err.message : String(err)}); building without a release`);
+  }
   const upload =
     options.uploadSourceMaps === true ||
     ((options.uploadSourceMaps ?? 'auto') === 'auto' && Boolean(options.upload?.apiKey ?? env.TALARIA_RELEASE_KEY));
@@ -102,15 +109,20 @@ export function withTalariaConfig<T extends object>(
       async runAfterProductionCompile(ctx: { distDir: string; projectDir: string }) {
         if (previousAfter) await previousAfter(ctx);
         if (!upload) return;
-        await finalizeTalariaRelease({
-          ...(options.upload ?? {}),
-          projectDir: ctx.projectDir,
-          distDir: ctx.distDir ? relativeDist(ctx.projectDir, ctx.distDir) : nextConfig.distDir,
-          release: identity.release,
-          commitSha: identity.commitSha,
-          deleteSourceMaps: hide,
-          log: options.silent ? () => {} : undefined,
-        });
+        // finalizeTalariaRelease never throws; this guard keeps any fault out of `next build`.
+        try {
+          await finalizeTalariaRelease({
+            ...(options.upload ?? {}),
+            projectDir: ctx.projectDir,
+            distDir: ctx.distDir ? relativeDist(ctx.projectDir, ctx.distDir) : nextConfig.distDir,
+            release: identity.release,
+            commitSha: identity.commitSha,
+            deleteSourceMaps: hide,
+            log: options.silent ? () => {} : undefined,
+          });
+        } catch (err) {
+          warn(`source map upload failed (${err instanceof Error ? err.message : String(err)}); the build continues`);
+        }
       },
     },
     webpack(config: WebpackConfig, context: WebpackContext) {

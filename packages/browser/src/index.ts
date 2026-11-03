@@ -29,8 +29,14 @@ const client = new TalariaClient();
  * ```
  */
 export const Talaria = {
+  /** Never throws. A missing or invalid key leaves Talaria disabled (one warning). */
   init(options: TalariaInitOptions): void {
     client.init(options);
+  },
+
+  /** False before init, after a failed init (bad key or option), and after close. */
+  isEnabled(): boolean {
+    return client.isEnabled();
   },
 
   captureException(error: unknown, context?: CaptureContext): Promise<void> {

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1
+
+- Fail safe (Talaria D19): `initClient`, `initServer` and `initEdge` never throw. A missing or invalid key leaves Talaria disabled with one warning; `initClient` then adds no listeners and `initServer` no HTTP patch. `withServerAction`, `withRouteHandler` and `captureRequestError` never let a Talaria fault change the handler's result.
+- The build never fails because of Talaria: `withTalariaConfig` and `finalizeTalariaRelease` warn and continue on a missing, malformed or wrong-checksum release key, an unreachable Talaria, a failed upload or any internal fault, and still delete public source maps.
+- `talaria-nextjs upload` exits 0 in those cases and prints a warning. Only a usage error exits non-zero (2).
+- Depends on `@newtalaria/*` ^0.6.1.
+
 ## 0.6.0
 
 - **Breaking:** `dsn` is removed. Client, server, and edge init take `url` only. When `url` and `TALARIA_URL` are unset, the host is `https://ingest-<cell>.newtalaria.com` from the key cell. `TALARIA_URL` (client: `NEXT_PUBLIC_TALARIA_URL`) overrides that host. A `self` cell requires a URL.

@@ -12,11 +12,11 @@ globs:
 
 ## Wire contract
 
-Events: `POST {baseUrl}/events/ingestBatch`. Spans: `POST {baseUrl}/spans/ingestBatch`. Analytics: `POST {baseUrl}/analytics/ingestBatch`. Feature flags: `POST {baseUrl}/flags/evaluate`. Replay (browser only): `replays/start`, `replays/ingestSegmentBatch`, `replays/finish`. Heatmaps (browser only, analytics consent + `analyticsWrite` scope): `heatmaps/ingestBatch`, `heatmaps/uploadSnapshot`.
+Events: `POST {baseUrl}/v1/events`. Spans: `POST {baseUrl}/v1/spans`. Analytics: `POST {baseUrl}/v1/analytics`. Feature flags: `POST {baseUrl}/v1/flags/evaluate`. Replay (browser only): `POST /v1/replays`, `/v1/replays/segments`, `/v1/replays/{replayId}/finish`. Heatmaps (browser only, analytics consent + `analyticsWrite` scope): `POST /v1/heatmaps`, `/v1/heatmaps/snapshots`. Policy: `GET /v1/sdk-config`.
 
-- Header: `X-API-Key` only
-- Serverpod envelopes with `__className__`
-- Parse both `__className__` and `className` from error bodies
+- Header: `Authorization: Bearer <key>`
+- Errors are `application/problem+json`; parse `className`, `retry` and `message`
+- Transport errors never reach host code (D19). Log them with `logRateLimited` (once per channel per minute), never a bare `console.warn` per failure
 
 ## Permanent ingest disable
 

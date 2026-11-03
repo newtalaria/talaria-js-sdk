@@ -1,3 +1,4 @@
+import { errorMessage, logRateLimited, warnDisabledOnce } from '@newtalaria/core';
 import {
   AnalyticsFacade,
   createMemoryStorage,
@@ -39,6 +40,28 @@ import { NodeTracer } from './tracer.js';
 import type { TalariaNodeInitOptions } from './types.js';
 
 const PLATFORM = 'node';
+const LOG_LABEL = '@newtalaria/node';
+
+function rawKey(raw: unknown): string | undefined {
+  try {
+    const key = (raw as { apiKey?: unknown } | null | undefined)?.apiKey;
+    return typeof key === 'string' ? key : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Throws on a missing key or bad options. `init` catches it (D19). */
+function readApiKey(raw: TalariaNodeInitOptions): string {
+  if (!raw || typeof raw !== 'object') throw new Error('init options must be an object');
+  if (raw.apiKey !== undefined && raw.apiKey !== null && typeof raw.apiKey !== 'string') {
+    throw new Error('`apiKey` must be a string');
+  }
+  const env = typeof process !== 'undefined' ? process.env : {};
+  const apiKey = (raw.apiKey || env.TALARIA_API_KEY || '').trim();
+  if (!apiKey) throw new Error('no API key (pass `apiKey` or set TALARIA_API_KEY)');
+  return apiKey;
+}
 
 export class TalariaNodeClient {
   private options: (TalariaNodeInitOptions & {
@@ -62,17 +85,67 @@ export class TalariaNodeClient {
   private ingestDisabled = false;
   private enableFlags = false;
   private teardowns: Array<() => void> = [];
+  /** Set when init disabled Talaria (bad key or option). */
+  private disabledReason: string | null = null;
   private breadcrumbs = new BreadcrumbBuffer();
 
+  /**
+   * Never throws (D19). A missing or invalid key, a bad option, or any other
+   * init fault leaves a disabled client: no network, no process handlers, and
+   * every public method is a no-op. One warning per process.
+   */
   init(raw: TalariaNodeInitOptions): void {
     if (this.options) {
       console.warn('@newtalaria/node: already initialized');
       return;
     }
-    const apiKey = (raw.apiKey || process.env.TALARIA_API_KEY || '').trim();
-    if (!apiKey) {
-      throw new Error('@newtalaria/node: init requires `apiKey` or TALARIA_API_KEY');
+    let apiKey = '';
+    try {
+      apiKey = readApiKey(raw);
+      this.start(raw, apiKey);
+      this.disabledReason = null;
+    } catch (error) {
+      this.abandonInit();
+      this.disabledReason = errorMessage(error);
+      warnDisabledOnce(LOG_LABEL, this.disabledReason, apiKey || rawKey(raw));
     }
+  }
+
+  /** True after a successful `init` and until `close`. */
+  isEnabled(): boolean {
+    return this.options !== null && !this.ingestDisabled;
+  }
+
+  /** Why init left Talaria disabled, or null. */
+  getDisabledReason(): string | null {
+    return this.disabledReason;
+  }
+
+  /** Undo a half-finished `init`. Never throws. */
+  private abandonInit(): void {
+    for (const undo of this.teardowns.splice(0).reverse()) {
+      try {
+        undo();
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      this.flagsClient?.close();
+    } catch {
+      /* ignore */
+    }
+    this.options = null;
+    this.transport = null;
+    this.eventQueue = null;
+    this.tracer = null;
+    this.flagsClient = null;
+    this.analyticsFacade = null;
+    this.identity = null;
+    this.sessionId = null;
+  }
+
+  private start(raw: TalariaNodeInitOptions, apiKey: string): void {
     assertServerCredential(apiKey);
     const baseUrl = resolveIngestUrl({
       apiKey,
@@ -108,7 +181,7 @@ export class TalariaNodeClient {
       apiKey,
     });
     this.eventQueue = EventIngestQueue.forTransport(this.transport, (error) => {
-      console.warn('@newtalaria/node: event ingest failed', error);
+      logRateLimited('@newtalaria/node:event ingest failed', '@newtalaria/node: event ingest failed', error);
       if (IngestError.fromUnknown(error).isPermanent) {
         this.disable(error, 'events');
       }
@@ -239,6 +312,9 @@ export class TalariaNodeClient {
         writePolicyCache(storage, this.options.apiKey, tombstone);
         this.ingestDisabled = true;
         this.eventQueue?.disable();
+      })
+      .catch((error: unknown) => {
+        logRateLimited(`${LOG_LABEL}:policy`, '@newtalaria/node: sdk-config failed (ignored)', error);
       });
   }
 
@@ -258,6 +334,8 @@ export class TalariaNodeClient {
   get analytics(): AnalyticsFacade {
     if (!this.analyticsFacade) {
       this.analyticsFacade = this.createAnalyticsFacade();
+      // Before init or after a failed init: a kill-switched no-op facade.
+      if (!this.options) this.analyticsFacade.disable();
     }
     return this.analyticsFacade;
   }
@@ -289,13 +367,11 @@ export class TalariaNodeClient {
     });
   }
 
+  /** Before init or after a failed init this is a disabled no-op client. */
   private createFlagsClient(): TalariaFlags {
-    if (!this.options || !this.identity) {
-      throw new Error('@newtalaria/node: call Talaria.init() first');
-    }
     return new TalariaFlags({
-      apiKey: this.options.apiKey,
-      identity: this.identity,
+      apiKey: this.options?.apiKey ?? '',
+      identity: this.identity ?? new IdentityStore(createMemoryStorage()),
       storage: createMemoryStorage(),
       getTransport: () => this.transport,
       isEnabled: () => this.enableFlags,
@@ -306,6 +382,7 @@ export class TalariaNodeClient {
   }
 
   addBreadcrumb(crumb: Partial<Breadcrumb> & { type?: string; message?: string }): void {
+    if (!this.options) return;
     this.breadcrumbs.add(normalizeBreadcrumb(crumb));
   }
 
@@ -379,7 +456,17 @@ export class TalariaNodeClient {
     };
   }
 
+  /** Never rejects (D19). */
   async captureException(error: unknown, context?: CaptureContext): Promise<void> {
+    if (!this.options || this.ingestDisabled) return;
+    try {
+      await this.captureExceptionUnsafe(error, context);
+    } catch (fault) {
+      logRateLimited(`${LOG_LABEL}:capture`, '@newtalaria/node: capture failed (ignored)', fault);
+    }
+  }
+
+  private async captureExceptionUnsafe(error: unknown, context?: CaptureContext): Promise<void> {
     const err = error instanceof Error ? error : new Error(String(error));
     const stamp = readModelErrorStamp(error) ?? readModelErrorStamp(err);
     const tags = { ...context?.tags };
@@ -408,24 +495,47 @@ export class TalariaNodeClient {
     level: SeverityLevel = 'info',
     context?: CaptureContext,
   ): Promise<void> {
-    await this.send({ message, level, context });
+    if (!this.options || this.ingestDisabled) return;
+    try {
+      await this.send({ message, level, context });
+    } catch (fault) {
+      logRateLimited(`${LOG_LABEL}:capture`, '@newtalaria/node: capture failed (ignored)', fault);
+    }
   }
 
+  /** Never rejects: transport faults are logged, rate-limited. */
   async flush(): Promise<void> {
-    await Promise.all([
-      this.eventQueue?.flush() ?? Promise.resolve(),
-      this.tracer?.flush() ?? Promise.resolve(),
-      this.analyticsFacade?.flush() ?? Promise.resolve(),
-    ]);
+    try {
+      await Promise.all([
+        this.eventQueue?.flush() ?? Promise.resolve(),
+        this.tracer?.flush() ?? Promise.resolve(),
+        this.analyticsFacade?.flush() ?? Promise.resolve(),
+      ]);
+    } catch (error) {
+      logRateLimited(`${LOG_LABEL}:flush`, '@newtalaria/node: flush failed (ignored)', error);
+    }
   }
 
   async close(): Promise<void> {
-    this.flagsClient?.close();
+    try {
+      this.flagsClient?.close();
+    } catch {
+      /* ignore */
+    }
     this.flagsClient = null;
     await this.flush();
-    for (const undo of this.teardowns) undo();
-    this.teardowns = [];
-    await this.tracer?.shutdown();
+    for (const undo of this.teardowns.splice(0)) {
+      try {
+        undo();
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      await this.tracer?.shutdown();
+    } catch (error) {
+      logRateLimited(`${LOG_LABEL}:flush`, '@newtalaria/node: tracer shutdown failed (ignored)', error);
+    }
   }
 
   private installProcessHandlers(): void {
@@ -511,7 +621,7 @@ export class TalariaNodeClient {
           breadcrumbs: this.breadcrumbs.size ? this.breadcrumbs.snapshot() : undefined,
         });
     } catch (error) {
-      console.warn('@newtalaria/node: event ingest failed', error);
+      logRateLimited('@newtalaria/node:event ingest failed', '@newtalaria/node: event ingest failed', error);
       if (IngestError.fromUnknown(error).isPermanent) {
         this.disable(error, 'events');
       }

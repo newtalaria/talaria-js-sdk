@@ -1,3 +1,4 @@
+import { logRateLimited } from '@newtalaria/core';
 import { IngestError, sanitizeTelemetryUrl } from '@newtalaria/core';
 import type { ServerpodTransport } from '../transport/serverpod.js';
 import {
@@ -183,7 +184,7 @@ export class HeatmapRecorder {
         }
         for (const id of result.snapshotRequests) this.scheduleSnapshot(id);
       } catch (error) {
-        console.warn('@newtalaria/browser: heatmap ingest failed', error);
+        logRateLimited('@newtalaria/browser:heatmap ingest failed', '@newtalaria/browser: heatmap ingest failed', error);
         const parsed = IngestError.fromUnknown(error);
         if (parsed.isGlobalCredentialFailure) {
           this.disable();
@@ -227,7 +228,7 @@ export class HeatmapRecorder {
           capturedAt: captured.capturedAt.toISOString(),
         });
       } catch (error) {
-        console.warn('@newtalaria/browser: heatmap snapshot upload failed', error);
+        logRateLimited('@newtalaria/browser:heatmap snapshot upload failed', '@newtalaria/browser: heatmap snapshot upload failed', error);
       }
     };
 

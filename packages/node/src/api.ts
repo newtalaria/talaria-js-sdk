@@ -6,8 +6,13 @@ const client = new TalariaNodeClient();
 
 /** HTTP-free facade so Next.js server wrappers do not pull `node:http`. */
 export const Talaria = {
+  /** Never throws. A missing or invalid key leaves Talaria disabled (one warning). */
   init(options: TalariaNodeInitOptions): void {
     client.init(options);
+  },
+  /** False before init, after a failed init (bad key or option), and after close. */
+  isEnabled(): boolean {
+    return client.isEnabled();
   },
   captureException(error: unknown, context?: CaptureContext): Promise<void> {
     return client.captureException(error, context);

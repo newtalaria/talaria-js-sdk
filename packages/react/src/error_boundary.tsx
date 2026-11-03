@@ -29,12 +29,17 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    void Talaria.captureException(error, {
-      mechanism: { type: 'react', handled: true },
-      extra: {
-        componentStack: info.componentStack ?? '',
-      },
-    });
+    // A Talaria fault never breaks the boundary or skips onError (D19).
+    try {
+      void Talaria.captureException(error, {
+        mechanism: { type: 'react', handled: true },
+        extra: {
+          componentStack: info?.componentStack ?? '',
+        },
+      }).catch(() => undefined);
+    } catch {
+      /* ignore */
+    }
     this.props.onError?.(error, info);
   }
 

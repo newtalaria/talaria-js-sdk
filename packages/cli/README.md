@@ -62,6 +62,6 @@ Hidden source maps work. Talaria reads the uploaded file when the event is opene
 
 `--silverstripe-combine-files` is the Silverstripe compatibility mode. `Requirements::combine_files` writes one header line before the first file. The flag shifts that map's generated lines by one and still writes the debug id into the sibling `.js`. The uploaded script is that first file. Deploy the rewritten `.js` so the combiner reads it. A script the browser loads directly is uploaded without the flag.
 
-The command walks `*.js.map`, skips `node_modules` and `.git`, and skips other maps such as `styles.css.map`. Each path segment must match `^[A-Za-z0-9._~+-]+$`, with no `..`, and the full name must be at most 200 characters. The same release and file name replaces the previous map. The process exits non-zero if any file fails.
+The command walks `*.js.map`, skips `node_modules` and `.git`, and skips other maps such as `styles.css.map`. Each path segment must match `^[A-Za-z0-9._~+-]+$`, with no `..`, and the full name must be at most 200 characters. The same release and file name replaces the previous map. A missing or invalid key, an unreachable Talaria, or a failed upload prints a warning and exits 0, so a deploy never fails because of Talaria. Only a usage error (an unknown flag) exits non-zero.
 
 Talaria matches a debug id first, then the release plus that artifact path. A stored name with no slash still matches the basename. The full walkthrough is Talaria docs, **Upload JavaScript source maps** (`guides/upload-javascript-source-maps`).

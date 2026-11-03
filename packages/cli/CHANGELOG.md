@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Fail safe (Talaria D19): `talaria source-maps upload` exits 0 with a warning when the release key is missing or invalid, Talaria is unreachable, or some maps fail, so a deploy never fails because of Talaria. Only a usage error exits non-zero (2). `uploadSourceMaps` never throws and returns `UPLOAD_OK`, `UPLOAD_INCOMPLETE` or `UPLOAD_USAGE`; `exitCodeFor` maps that to the process exit code. Error lines show at most 8 key characters.
+- Depends on `@newtalaria/core` ^0.6.1.
+
 ## 0.6.0
 
 - **Breaking:** `dsn` is removed. `talaria source-maps upload` posts plain base64 gzip to `POST /v1/source-maps` with `Authorization: Bearer`. `TALARIA_RELEASE_KEY` (or `--api-key`) must be a `tal_sk_<env>_<cell>_<43><6>` key (CRC32 base62 checksum). The host is `TALARIA_URL` / `--url`, otherwise `https://ingest-<cell>.newtalaria.com` from the key cell. A `self` cell requires `--url` or `TALARIA_URL`. Errors are `application/problem+json`.

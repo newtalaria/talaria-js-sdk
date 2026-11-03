@@ -1,3 +1,4 @@
+import { errorMessage, logRateLimited, warnDisabledOnce } from '@newtalaria/core';
 import {
   BreadcrumbBuffer,
   ingestEventBatch,
@@ -26,27 +27,49 @@ let release: string | undefined;
 let commitSha: string | undefined;
 let releaseRefKind: 'branch' | 'tag' | undefined;
 
+/**
+ * Never throws (D19). A missing or invalid key, or a bad option, leaves the
+ * edge SDK disabled: nothing is sent and every call is a no-op. One warning.
+ */
 export function initEdge(options: CoreInitOptions): void {
-  const apiKey = (options.apiKey || '').trim();
-  if (!apiKey) {
-    throw new Error('@newtalaria/nextjs: initEdge requires `apiKey`');
+  let apiKey = '';
+  try {
+    if (!options || typeof options !== 'object') throw new Error('init options must be an object');
+    if (options.apiKey !== undefined && options.apiKey !== null && typeof options.apiKey !== 'string') {
+      throw new Error('`apiKey` must be a string');
+    }
+    apiKey = (options.apiKey || '').trim();
+    if (!apiKey) throw new Error('no API key (pass `apiKey`)');
+    assertServerCredential(apiKey);
+    const envUrl =
+      typeof process !== 'undefined' ? process.env.TALARIA_URL : undefined;
+    const baseUrl = resolveIngestUrl({ apiKey, url: options.url || envUrl });
+    const identity = resolveReleaseIdentity({
+      release: options.release,
+      commitSha: options.commitSha,
+      env: readProcessReleaseEnv(),
+    });
+    const next = new ServerpodTransport({ baseUrl, apiKey });
+    scope.clear();
+    if (options.userId) scope.setUser({ id: options.userId });
+    if (options.tags) scope.setTags(options.tags);
+    release = identity.release;
+    commitSha = identity.commitSha;
+    releaseRefKind = identity.releaseRefKind;
+    transport = next;
+  } catch (error) {
+    transport = null;
+    warnDisabledOnce(
+      '@newtalaria/nextjs/edge',
+      errorMessage(error),
+      apiKey || (typeof options?.apiKey === 'string' ? options.apiKey : undefined),
+    );
   }
-  assertServerCredential(apiKey);
-  const envUrl =
-    typeof process !== 'undefined' ? process.env.TALARIA_URL : undefined;
-  const baseUrl = resolveIngestUrl({ apiKey, url: options.url || envUrl });
-  transport = new ServerpodTransport({ baseUrl, apiKey });
-  const identity = resolveReleaseIdentity({
-    release: options.release,
-    commitSha: options.commitSha,
-    env: readProcessReleaseEnv(),
-  });
-  release = identity.release;
-  commitSha = identity.commitSha;
-  releaseRefKind = identity.releaseRefKind;
-  scope.clear();
-  if (options.userId) scope.setUser({ id: options.userId });
-  if (options.tags) scope.setTags(options.tags);
+}
+
+/** False before init and after a failed init (bad key or option). */
+export function isEnabled(): boolean {
+  return transport !== null;
 }
 
 export function setUser(user: UserContext | null): void {
@@ -105,6 +128,23 @@ async function send(args: {
   context?: CaptureContext;
 }): Promise<void> {
   if (!transport) return;
+  try {
+    await sendUnsafe(transport, args);
+  } catch (fault) {
+    logRateLimited('@newtalaria/nextjs/edge:capture', '@newtalaria/nextjs/edge: capture failed (ignored)', fault);
+  }
+}
+
+async function sendUnsafe(
+  transport: ServerpodTransport,
+  args: {
+    message: string;
+    level: SeverityLevel;
+    title?: string;
+    stackTrace?: string;
+    context?: CaptureContext;
+  },
+): Promise<void> {
   const extra = scope.mergeCaptureExtra(args.context?.extra);
   const tags = mergeTags(scope.getTags(), args.context?.tags);
   const isError = args.level === 'error' || args.level === 'fatal';
@@ -135,12 +175,13 @@ async function send(args: {
       },
     ]);
   } catch (ingestError) {
-    console.warn('@newtalaria/nextjs/edge: event ingest failed', ingestError);
+    logRateLimited('@newtalaria/nextjs/edge:event ingest failed', '@newtalaria/nextjs/edge: event ingest failed', ingestError);
   }
 }
 
 export const Talaria = {
   init: initEdge,
+  isEnabled,
   captureException,
   captureMessage,
   setUser,

@@ -50,7 +50,10 @@ export class EventIngestQueue {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    this.chain = this.chain.then(() => this.drain(opts));
+    this.chain = this.chain.then(
+      () => this.drain(opts),
+      () => this.drain(opts),
+    );
     return this.chain;
   }
 
@@ -79,7 +82,11 @@ export class EventIngestQueue {
       try {
         await this.send(batch, { keepalive });
       } catch (error) {
-        this.onError?.(error);
+        try {
+          this.onError?.(error);
+        } catch {
+          /* an error callback must not break the queue */
+        }
       }
     }
   }

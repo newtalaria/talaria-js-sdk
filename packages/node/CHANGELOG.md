@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1
+
+- Fail safe (Talaria D19): `Talaria.init` never throws. A missing or invalid key (including a bad `TALARIA_API_KEY`), a monitor token, or bad options leave a disabled client: no network, no `uncaughtException` / `unhandledRejection` / `beforeExit` handlers, no outgoing HTTP patch, and every public method is a no-op. One warning per process, with at most 8 key characters.
+- `Talaria.isEnabled()` and `TalariaNodeClient.getDisabledReason()`. `Talaria.flags` and `Talaria.analytics` before init are disabled no-ops.
+- Capture, flush and close never reject. Transport errors are logged at most once per minute per kind.
+- Depends on `@newtalaria/core` ^0.6.1.
+
 ## 0.6.0
 
 - **Breaking:** `dsn` is removed. Init takes `url` or `TALARIA_URL`. When both are unset, the host is `https://ingest-<cell>.newtalaria.com` from the key cell. A `self` cell requires `url` or `TALARIA_URL`.
