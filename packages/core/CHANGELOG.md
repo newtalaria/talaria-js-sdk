@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+- IB3 ingest control: `ingest_blocked` is not a permanent failure. The SDK backs off for `retryAfterSeconds` (clamped 15 minutes to 24 hours), logs one warning, drops the current batch and does not retry in between. After the wait it probes again, and `GET /v1/sdk-config` `ingestBlock` (`state`, `reason`, `retryAfterSeconds`) can pause or resume earlier. `forbidden_origin` is a permanent, in-process stop (not persisted across a reload).
+- New `IngestBlockGate`, `clampIngestBlockRetry`, `parseIngestBlock`. `IngestError` reads `reason` and `retryAfterSeconds`. `ServerpodTransport` skips ingest POSTs while the gate is paused; `sdk-config` is never skipped.
+
+
 ## 0.6.1
 
 - Fail safe (Talaria D19): new `keyPreview`, `warnDisabledOnce`, `logRateLimited`, `guard`, `guardAsync` and `resetFailSafe` helpers. SDKs log one "Talaria is disabled" warning per process (per page in the browser), showing at most the key's first 8 characters, and log transport faults at most once per channel per minute.

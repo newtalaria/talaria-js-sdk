@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- IB3 ingest control: inherited from `@newtalaria/browser`, `@newtalaria/node` and `@newtalaria/core`. `ingest_blocked` backs off; one warning; the host app is never blocked.
+
+
 ## 0.6.1
 
 - Fail safe (Talaria D19): `initClient`, `initServer` and `initEdge` never throw. A missing or invalid key leaves Talaria disabled with one warning; `initClient` then adds no listeners and `initServer` no HTTP patch. `withServerAction`, `withRouteHandler` and `captureRequestError` never let a Talaria fault change the handler's result.

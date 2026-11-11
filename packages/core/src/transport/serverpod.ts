@@ -1,8 +1,14 @@
 import { IngestError, TransportError } from './ingest_error.js';
+import {
+  IngestBlockGate,
+  isIngestPostPath,
+} from './ingest_block.js';
 
 export interface ServerpodTransportOptions {
   baseUrl: string;
   apiKey: string;
+  /** Shared gate for `ingest_blocked`. Created if omitted. */
+  blockGate?: IngestBlockGate;
 }
 
 /**
@@ -44,6 +50,7 @@ export interface CallOptions {
 export class ServerpodTransport {
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  readonly blockGate: IngestBlockGate;
   private caps: ServerCapabilities = {
     gzipRequests: false,
     binaryUploads: false,
@@ -52,6 +59,7 @@ export class ServerpodTransport {
   constructor(options: ServerpodTransportOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.apiKey = options.apiKey;
+    this.blockGate = options.blockGate ?? new IngestBlockGate();
   }
 
   getBaseUrl(): string {
@@ -90,6 +98,10 @@ export class ServerpodTransport {
     const path = [endpoint, method].filter((part) => part.length > 0).join('/');
     let url = `${this.baseUrl}/${path}`;
     const label = path;
+    await this.blockGate.waitForPolicy();
+    if (this.blockGate.isBlocked && isIngestPostPath(path, opts?.method)) {
+      return undefined;
+    }
 
     if (opts?.method === 'GET') {
       const params = new URLSearchParams();
@@ -158,6 +170,10 @@ export class ServerpodTransport {
       credentials: 'omit',
     };
     if (opts?.signal) init.signal = opts.signal;
+    await this.blockGate.waitForPolicy();
+    if (this.blockGate.isBlocked) {
+      return undefined;
+    }
     const response = await fetch(`${this.baseUrl}${path}?${params}`, init);
     return this.read(response, path.replace(/^\//, ''));
   }
@@ -191,9 +207,19 @@ export class ServerpodTransport {
     if (!response.ok) {
       const text = await response.text().catch(() => '');
       const parsed = IngestError.parse(text);
+      const retryAfter =
+        parsed.retryAfterSeconds ?? parseRetryAfter(response.headers.get('retry-after'));
+      const error = new IngestError({
+        code: parsed.code,
+        message: parsed.message,
+        retry: parsed.retry,
+        reason: parsed.reason,
+        retryAfterSeconds: retryAfter,
+      });
+      this.blockGate.applyFromError(error);
       let detail = text.slice(0, 400);
-      const code = parsed.code ?? parsed.className;
-      const message = parsed.message;
+      const code = error.code ?? error.className;
+      const message = error.message;
       if (code || message) {
         detail = [code, message].filter(Boolean).join(': ');
       }
@@ -201,9 +227,12 @@ export class ServerpodTransport {
         `Talaria ${label} failed: HTTP ${response.status}${detail ? ` — ${detail}` : ''}`,
         {
           status: response.status,
-          className: parsed.className,
-          retry: parsed.retry,
-          bodyMessage: parsed.message,
+          className: error.className,
+          code: error.code,
+          retry: error.retry,
+          bodyMessage: error.message,
+          reason: error.reason,
+          retryAfterSeconds: error.retryAfterSeconds,
         },
       );
     }
@@ -234,3 +263,10 @@ export async function gzipJson(json: string): Promise<Uint8Array | null> {
     return null;
   }
 }
+
+function parseRetryAfter(header: string | null): number | null {
+  if (!header) return null;
+  const seconds = Number(header.trim());
+  return Number.isFinite(seconds) ? Math.floor(seconds) : null;
+}
+

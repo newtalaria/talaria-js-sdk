@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- IB3 ingest control: on `ingest_blocked`, back off for `retryAfterSeconds` (15 minutes to 24 hours), log one warning and stop sending until the next check. `sdk-config.ingestBlock` can pause or resume earlier. `forbidden_origin` is a permanent in-process stop.
+
+
 ## 0.6.1
 
 - Fail safe (Talaria D19): `Talaria.init` never throws. A missing or invalid key (including a bad `TALARIA_API_KEY`), a monitor token, or bad options leave a disabled client: no network, no `uncaughtException` / `unhandledRejection` / `beforeExit` handlers, no outgoing HTTP patch, and every public method is a no-op. One warning per process, with at most 8 key characters.

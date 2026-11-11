@@ -432,6 +432,18 @@ interface RecentNetworkFailure extends NetworkMeta {
   promoted: boolean;
 }
 
+
+function browserSessionStorage(): Storage | null {
+  try {
+    if (typeof sessionStorage === 'undefined') return null;
+    const probe = sessionStorage;
+    probe.getItem('talaria.ingestBlock.probe');
+    return probe;
+  } catch {
+    return null;
+  }
+}
+
 function browserPolicyStorage(): SdkPolicyStorage | null {
   if (typeof localStorage === 'undefined') return null;
   return {
@@ -673,6 +685,7 @@ export class TalariaClient {
       baseUrl: this.options.baseUrl,
       apiKey: this.options.apiKey,
     });
+    this.transport.blockGate.restoreFromSession(browserSessionStorage(), this.options.apiKey);
     this.eventQueue = EventIngestQueue.forTransport(this.transport, (error) => {
       logRateLimited(`${LOG_LABEL}:events`, '@newtalaria/browser: event ingest failed', error);
       if (isPermanentIngestError(error)) {
@@ -929,6 +942,11 @@ export class TalariaClient {
       Math.max(60, Math.floor(document.ttlSeconds ?? 300)),
     );
     this.flagsClient?.onPolicyUpdated({ pollIntervalMs: ttlSeconds * 1000 });
+    this.transport?.blockGate.applyFromDocument(document.ingestBlock);
+    this.transport?.blockGate.rememberInSession(
+      browserSessionStorage(),
+      this.options.apiKey,
+    );
   }
 
   private stopForInactivePolicy(): void {
@@ -956,12 +974,17 @@ export class TalariaClient {
     const cached = readPolicyCache(storage, this.options.apiKey);
     if (cached && tombstoneIsQuiet(cached, now)) {
       this.stopForInactivePolicy();
+      this.transport.blockGate.markPolicyChecked();
       return;
     }
     if (cached?.kind === 'document' && cached.document) {
       this.applySdkConfig(cached.document);
-      if (documentIsFresh(cached, now)) return;
+      if (documentIsFresh(cached, now)) {
+        this.transport.blockGate.markPolicyChecked();
+        return;
+      }
     }
+    this.transport.blockGate.beginPolicyCheck();
     const revision =
       cached?.kind === 'document' ? cached.document?.revision : undefined;
     void fetchSdkConfig(this.transport, {
@@ -989,12 +1012,16 @@ export class TalariaClient {
       })
       .catch((error: unknown) => {
         const tombstone = tombstoneFromError(error, Date.now());
-        if (!tombstone || !this.options) return;
-        writePolicyCache(storage, this.options.apiKey, tombstone);
-        this.stopForInactivePolicy();
+        if (tombstone && this.options) {
+          writePolicyCache(storage, this.options.apiKey, tombstone);
+          this.stopForInactivePolicy();
+        }
       })
       .catch((error: unknown) => {
         logRateLimited(`${LOG_LABEL}:policy`, '@newtalaria/browser: sdk-config failed (ignored)', error);
+      })
+      .finally(() => {
+        this.transport?.blockGate.markPolicyChecked();
       });
   }
 

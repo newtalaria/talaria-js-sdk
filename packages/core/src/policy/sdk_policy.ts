@@ -38,6 +38,12 @@ export interface SdkConfigDocument {
     replays?: SdkMeterPolicy;
     analytics?: SdkMeterPolicy;
   };
+  /** IB3 typed ingest-control block. Separate from the per-meter `ingest` policy. */
+  ingestBlock?: {
+    state: 'ok' | 'blocked';
+    reason?: string;
+    retryAfterSeconds?: number;
+  };
 }
 
 export interface SdkPolicyCacheEntry {
@@ -150,6 +156,10 @@ export async function fetchSdkConfig(
   // Full and `unchanged` responses both carry capabilities; a server that
   // sends none (older) turns gzip and binary uploads off.
   transport.setCapabilities(document.capabilities);
+  if (document.ingestBlock) {
+    transport.blockGate.applyFromDocument(document.ingestBlock);
+  }
+  transport.blockGate.markPolicyChecked();
   return document;
 }
 

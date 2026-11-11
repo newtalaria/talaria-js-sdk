@@ -107,6 +107,18 @@ export {
   type IngestSignal,
 } from './transport/ingest_error.js';
 export {
+  INGEST_BLOCK_MAX_RETRY_SECONDS,
+  INGEST_BLOCK_MIN_RETRY_SECONDS,
+  IngestBlockGate,
+  clampIngestBlockRetry,
+  ingestBlockStorageKey,
+  isIngestPostPath,
+  parseIngestBlock,
+  type IngestBlockState,
+  type IngestBlockStatus,
+  type IngestBlockStorage,
+} from './transport/ingest_block.js';
+export {
   ingestEvent,
   ingestEventBatch,
   type IngestEventParams,

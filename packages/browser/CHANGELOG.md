@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- IB3 ingest control: on `ingest_blocked`, back off for `retryAfterSeconds` (15 minutes to 24 hours), log one warning and stop sending for the page. `GET /v1/sdk-config` is checked before the first send of a page load; a block is remembered in `sessionStorage` for the tab session. `forbidden_origin` permanently stops ingest for the page only.
+
+
 ## 0.6.1
 
 - Fail safe (Talaria D19): `Talaria.init` never throws. A missing, empty, malformed or wrong-checksum key, a `tal_sk_` key, a `self` cell without `url`, or bad options leave a disabled client: no network, no global handlers, no timers, and every public method is a no-op. One warning per page, with at most 8 key characters.

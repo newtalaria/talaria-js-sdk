@@ -274,6 +274,7 @@ export class TalariaNodeClient {
       Math.max(60, Math.floor(document.ttlSeconds ?? 300)),
     );
     this.flagsClient?.onPolicyUpdated({ pollIntervalMs: ttlSeconds * 1000 });
+    this.transport?.blockGate.applyFromDocument(document.ingestBlock);
   }
 
   private bootstrapPolicy(): void {
@@ -284,12 +285,17 @@ export class TalariaNodeClient {
     if (cached && tombstoneIsQuiet(cached, now)) {
       this.ingestDisabled = true;
       this.eventQueue?.disable();
+      this.transport.blockGate.markPolicyChecked();
       return;
     }
     if (cached?.kind === 'document' && cached.document) {
       this.applySdkConfig(cached.document);
-      if (documentIsFresh(cached, now)) return;
+      if (documentIsFresh(cached, now)) {
+        this.transport.blockGate.markPolicyChecked();
+        return;
+      }
     }
+    this.transport.blockGate.beginPolicyCheck();
     void fetchSdkConfig(this.transport, {
       sdkName: SDK_NAME,
       sdkVersion: SDK_VERSION,
@@ -315,6 +321,9 @@ export class TalariaNodeClient {
       })
       .catch((error: unknown) => {
         logRateLimited(`${LOG_LABEL}:policy`, '@newtalaria/node: sdk-config failed (ignored)', error);
+      })
+      .finally(() => {
+        this.transport?.blockGate.markPolicyChecked();
       });
   }
 
