@@ -98,9 +98,11 @@ export class ServerpodTransport {
     const path = [endpoint, method].filter((part) => part.length > 0).join('/');
     let url = `${this.baseUrl}/${path}`;
     const label = path;
-    await this.blockGate.waitForPolicy();
-    if (this.blockGate.isBlocked && isIngestPostPath(path, opts?.method)) {
-      return undefined;
+    // Ingest waits for an in-flight sdk-config check. The check itself must
+    // not wait: it is what opens the gate, and waiting here never returns.
+    if (isIngestPostPath(path, opts?.method)) {
+      await this.blockGate.waitForPolicy();
+      if (this.blockGate.isBlocked) return undefined;
     }
 
     if (opts?.method === 'GET') {

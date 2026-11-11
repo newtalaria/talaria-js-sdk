@@ -122,8 +122,9 @@ export class IngestBlockGate {
       await Promise.race([
         pending,
         new Promise<void>((resolve) => {
+          // Stay referenced. An unref'd timer never fires when this wait is
+          // the only handle, so an awaited send would stay pending forever.
           timer = setTimeout(resolve, timeoutMs);
-          timer.unref?.();
         }),
       ]);
     } catch {

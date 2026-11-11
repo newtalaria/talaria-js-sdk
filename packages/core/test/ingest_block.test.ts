@@ -104,6 +104,26 @@ describe('IngestBlockGate', () => {
     assert.equal(expired.isBlocked, false);
     assert.equal(store.has(key), false);
   });
+
+  it('waitForPolicy settles on its own when the check never finishes', async () => {
+    const gate = new IngestBlockGate(() => 0, () => {});
+    gate.beginPolicyCheck();
+    const start = Date.now();
+    await gate.waitForPolicy(40);
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed >= 30, `settled too soon: ${elapsed}ms`);
+    assert.ok(elapsed < 1000, `settled too late: ${elapsed}ms`);
+  });
+
+  it('waitForPolicy returns as soon as the check finishes', async () => {
+    const gate = new IngestBlockGate(() => 0, () => {});
+    gate.beginPolicyCheck();
+    const pending = gate.waitForPolicy(5000);
+    gate.markPolicyChecked();
+    const start = Date.now();
+    await pending;
+    assert.ok(Date.now() - start < 500);
+  });
 });
 
 describe('isIngestPostPath', () => {
