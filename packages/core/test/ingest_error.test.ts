@@ -39,4 +39,36 @@ describe('problem+json ingest errors', () => {
     assert.equal(cell.isPermanent, true);
     assert.equal(cell.retry, false);
   });
+
+  it('treats ingest_blocked as a retryable backoff, not a tombstone', () => {
+    const error = IngestError.parse(
+      JSON.stringify({
+        status: 402,
+        code: 'ingest_blocked',
+        reason: 'org_unpaid',
+        retryAfterSeconds: 900,
+        detail: 'Ingest is stopped for this organisation.',
+      }),
+    );
+    assert.equal(error.code, 'ingest_blocked');
+    assert.equal(error.reason, 'org_unpaid');
+    assert.equal(error.retryAfterSeconds, 900);
+    assert.equal(error.retry, true);
+    assert.equal(error.isPermanent, false);
+    assert.equal(error.isIngestBlocked, true);
+    assert.equal(error.isGlobalCredentialFailure, false);
+  });
+
+  it('treats forbidden_origin as a permanent in-process stop', () => {
+    const error = IngestError.parse(
+      JSON.stringify({
+        status: 403,
+        code: 'forbidden_origin',
+        detail: 'Origin is not allowed',
+      }),
+    );
+    assert.equal(error.retry, false);
+    assert.equal(error.isPermanent, true);
+    assert.equal(error.isIngestBlocked, false);
+  });
 });

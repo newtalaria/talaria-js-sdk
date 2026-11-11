@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- IB3 ingest control: inherited from `@newtalaria/browser` / `@newtalaria/core`. `ingest_blocked` backs off; one warning; the host app is never blocked.
+
+
 ## 0.6.1
 
 - Fail safe (Talaria D19): `ErrorBoundary`, `reactErrorHandler`, `Profiler` and `instrumentReactRouter` catch their own Talaria errors, so a Talaria fault never breaks a render, and `onError` / `after` always run.

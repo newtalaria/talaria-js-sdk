@@ -5,6 +5,7 @@ import {
   GZIP_MIN_BYTES,
   ServerpodTransport,
 } from '../src/transport/serverpod.js';
+import { IngestBlockGate } from '../src/transport/ingest_block.js';
 import { fetchSdkConfig } from '../src/policy/sdk_policy.js';
 
 interface Seen {
@@ -169,5 +170,40 @@ describe('ServerpodTransport gzip', () => {
     assert.equal(row.headers['Authorization'], 'Bearer tal_test_test');
     assert.equal(row.headers['Content-Encoding'], undefined);
     assert.deepEqual([...row.body], [...bytes]);
+  });
+});
+
+describe('ServerpodTransport ingest block gate', () => {
+  it('serves sdk-config while an ingest post waits for that check', async () => {
+    const seen: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      seen.push(String(input));
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    const gate = new IngestBlockGate();
+    gate.beginPolicyCheck();
+    const t = new ServerpodTransport({
+      baseUrl: 'https://ingest.example.com/',
+      apiKey: 'tal_test_test',
+      blockGate: gate,
+    });
+
+    const config = t.call('v1', 'sdk-config', { schemaVersion: 1 }, { method: 'GET' });
+    const events = t.call('v1', 'events', { events: [] });
+    const configResult = await Promise.race([
+      config.then(() => 'config'),
+      new Promise((resolve) => setTimeout(() => resolve('config-timeout'), 200)),
+    ]);
+    assert.equal(configResult, 'config');
+    assert.equal(seen.some((url) => url.includes('/v1/sdk-config')), true);
+    assert.equal(seen.some((url) => url.includes('/v1/events')), false);
+
+    gate.markPolicyChecked();
+    await events;
+    assert.equal(seen.some((url) => url.includes('/v1/events')), true);
   });
 });
